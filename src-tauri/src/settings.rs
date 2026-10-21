@@ -39,6 +39,11 @@ pub struct Settings {
     pub keep_audio: String,
     pub launch_at_login: bool,
     pub sync_enabled: bool,
+    /// Short sounds when notes start, pause, resume and stop.
+    pub sounds: bool,
+    /// The floating indicator while recording when Cereal isn't in front. Automatic
+    /// recordings always show it (never record silently).
+    pub show_indicator: bool,
 
     // ---- profile (improves notes) ----
     pub job_title: String,
@@ -102,6 +107,8 @@ impl Default for Settings {
             keep_audio: "keep".into(),
             launch_at_login: true,
             sync_enabled: true,
+            sounds: true,
+            show_indicator: true,
             job_title: String::new(),
             about: String::new(),
             role: String::new(),

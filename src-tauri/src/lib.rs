@@ -18,6 +18,7 @@ mod notes;
 mod process;
 mod recorder;
 mod settings;
+mod sounds;
 mod state;
 mod sync;
 mod updates;
@@ -177,6 +178,15 @@ pub fn dock_beside_call(app: &AppHandle) {
     let _ = w.set_position(PhysicalPosition::new(wa.position.x + wa.size.width as i32 - width as i32, wa.position.y));
 }
 
+/// 14 minutes of silence: ask "Still there?" before stopping at 15.
+pub fn show_still_there(st: &St) {
+    let call = detect::Call { key: "still-there".into(), app: String::new() };
+    show_popup(st, &call);
+    if let Some(app) = &st.app {
+        let _ = app.emit_to("popup", "still-there", ());
+    }
+}
+
 pub fn hide_popup(st: &St) {
     if let Some(app) = &st.app {
         if let Some(w) = app.get_webview_window("popup") {
@@ -196,7 +206,8 @@ pub fn update_pill(app: &AppHandle) {
     let (recording, auto) = app.try_state::<St>().map(|s| s.session.lock().as_ref().map(|x| (true, x.auto)).unwrap_or((false, false))).unwrap_or((false, false));
     let main_front = app.get_webview_window("main").map(|w| w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false) && !w.is_minimized().unwrap_or(false)).unwrap_or(false);
     // Always visible for automatic recordings; otherwise when the main window isn't in front.
-    let want = recording && (auto || !main_front);
+    let indicator = app.try_state::<St>().map(|s| s.settings.read().show_indicator).unwrap_or(true);
+    let want = recording && (auto || (!main_front && indicator));
     let pill = app.get_webview_window("pill");
     if !want {
         if let Some(p) = pill {
@@ -414,6 +425,8 @@ pub fn run() {
             commands::toolbay_account,
             commands::sync_status,
             commands::pill_click,
+            commands::still_here,
+            commands::current_event,
             commands::set_app_rule,
             library_cmds::folders_list,
             library_cmds::folder_save,

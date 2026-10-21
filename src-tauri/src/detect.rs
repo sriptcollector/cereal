@@ -22,6 +22,8 @@ pub struct Call {
 
 pub static DETECTED: Lazy<Mutex<Option<Call>>> = Lazy::new(|| Mutex::new(None));
 static SNOOZED: Lazy<Mutex<HashMap<String, Instant>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+/// At most one "meeting detected" card every 2 minutes (as Granola).
+static LAST_CARD: Lazy<Mutex<Option<Instant>>> = Lazy::new(|| Mutex::new(None));
 
 fn friendly(exe: &str, titles: &[String]) -> Option<String> {
     let e = exe.to_lowercase();
@@ -34,7 +36,7 @@ fn friendly(exe: &str, titles: &[String]) -> Option<String> {
         return None;
     }
     let browsers = [
-        "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "vivaldi.exe", "arc.exe", "chromium.exe",
+        "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "vivaldi.exe", "arc.exe", "chromium.exe", "zen.exe", "comet.exe", "helium.exe",
         "com.google.chrome", "com.apple.safari", "company.thebrowser.browser", "com.microsoft.edgemac", "org.mozilla.firefox", "com.brave.browser", "com.operasoftware.opera", "com.vivaldi.vivaldi",
     ];
     if browsers.contains(&e.as_str()) {
@@ -81,6 +83,14 @@ fn friendly(exe: &str, titles: &[String]) -> Option<String> {
         "ringcentral.exe" => "RingCentral",
         "dialpad.exe" => "Dialpad",
         "aircall.exe" => "Aircall",
+        "tuple.exe" | "app.tuple.app" => "Tuple",
+        "voovmeetingapp.exe" | "wemeetapp.exe" => "VooV Meeting",
+        "gather.exe" => "Gather",
+        "8x8 work.exe" | "8x8-work.exe" | "8x8work.exe" => "8x8",
+        "lark.exe" | "feishu.exe" => "Lark",
+        "roam.exe" => "Roam",
+        "clickup.exe" => "ClickUp",
+        "telemost.exe" | "yandex.telemost.exe" => "Yandex Telemost",
         _ => {
             if e.starts_with("mstea") {
                 "Microsoft Teams"
@@ -257,6 +267,31 @@ pub fn active_calls() -> Vec<Call> {
     v
 }
 
+/// Decides whether to stop a recording whose call app let go of the microphone `gone` ago.
+fn should_stop(st: &St, gone: Duration) -> Option<&'static str> {
+    if gone < Duration::from_secs(3) {
+        return None;
+    }
+    let (id, running, them_quiet) = {
+        let g = st.session.lock();
+        let s = g.as_ref()?;
+        (s.meeting_id.clone(), s.started.elapsed(), s.last_them.elapsed())
+    };
+    let event = st.db.meeting(&id).ok().flatten().map(|m| m.event_id).unwrap_or_default();
+    if let Some(end) = (!event.is_empty()).then(|| crate::calendar::event_end(&event)).flatten() {
+        if (chrono::Utc::now() - end).num_seconds().abs() <= 5 * 60 {
+            return Some("the meeting's scheduled end");
+        }
+    }
+    if running < Duration::from_secs(3 * 60) {
+        return (gone >= Duration::from_secs(60)).then_some("gone for a minute");
+    }
+    if them_quiet >= Duration::from_secs(10) {
+        return Some("the other side went quiet");
+    }
+    (gone >= Duration::from_secs(120)).then_some("gone for two minutes")
+}
+
 pub fn snooze(app: &str) {
     SNOOZED.lock().insert(app.to_string(), Instant::now());
 }
@@ -299,6 +334,11 @@ pub fn start(st: St) {
                         Err(e) => log::warn!("auto-record {}: {e:#}", c.app),
                     },
                     "ask" => {
+                        let mut last = LAST_CARD.lock();
+                        if last.map(|t| t.elapsed() < Duration::from_secs(120)).unwrap_or(false) {
+                            continue;
+                        }
+                        *last = Some(Instant::now());
                         *DETECTED.lock() = Some(c.clone());
                         crate::show_popup(&st, c);
                     }
@@ -310,15 +350,17 @@ pub fn start(st: St) {
                     crate::hide_popup(&st);
                 }
             }
-            // The call we're recording ended?
+            // The call we're recording ended? (Granola's rules: wait 3 s; stop at once near the
+            // calendar event's end; leave short recordings alone unless the app is gone for a
+            // minute; otherwise stop once the other side has gone quiet.)
             match recording_app {
                 Some(app) if !app.is_empty() && auto_stop => {
                     if calls.iter().any(|c| c.app == app) {
                         gone_since = None;
                     } else {
-                        let since = *gone_since.get_or_insert_with(Instant::now);
-                        if since.elapsed() > Duration::from_secs(20) {
-                            log::info!("auto-stop: {app} stopped using the microphone");
+                        let gone = gone_since.get_or_insert_with(Instant::now).elapsed();
+                        if let Some(why) = should_stop(&st, gone) {
+                            log::info!("auto-stop: {app} stopped using the microphone ({why})");
                             gone_since = None;
                             crate::recorder::stop(&st);
                         }

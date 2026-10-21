@@ -376,6 +376,19 @@ pub fn sync_status(st: State<St>) -> (bool, bool) {
     (crate::account::token().is_some(), crate::sync::available(&st))
 }
 
+/// "Keep going" on the Still there? card.
+#[tauri::command]
+pub fn still_here(st: State<St>) {
+    crate::recorder::still_here(&st);
+    crate::hide_popup(&st);
+}
+
+/// The calendar event happening now (for the "Meeting detected" card).
+#[tauri::command]
+pub fn current_event() -> Option<crate::calendar::Event> {
+    crate::calendar::current_event()
+}
+
 #[tauri::command]
 pub fn pill_click(app: AppHandle, st: State<St>) {
     let page = crate::recorder::recording_id(&st).map(|id| format!("meeting:{id}"));

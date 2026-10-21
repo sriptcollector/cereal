@@ -21,6 +21,10 @@ pub struct Session {
     pub auto: bool,
     /// Last time either side was clearly talking (for the 15-minute silence stop).
     pub last_voice: Instant,
+    /// Last time the other side (computer sound) was talking (for auto-stop).
+    pub last_them: Instant,
+    /// "Still there?" was asked (14 minutes of silence).
+    pub asked_still_there: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -107,8 +111,9 @@ pub fn start_with(st: &St, meeting_id: Option<String>, app: &str, title: &str, a
         st.db.set(&m.id, "app", app)?;
     }
     let stop = Arc::new(AtomicBool::new(false));
-    *st.session.lock() = Some(Session { meeting_id: m.id.clone(), app: app.to_string(), cap: Some(cap), stop: stop.clone(), started: Instant::now(), auto, last_voice: Instant::now() });
+    *st.session.lock() = Some(Session { meeting_id: m.id.clone(), app: app.to_string(), cap: Some(cap), stop: stop.clone(), started: Instant::now(), auto, last_voice: Instant::now(), last_them: Instant::now(), asked_still_there: false });
     log::info!("recording started: {} ({})", m.id, if app.is_empty() { "manual" } else { app });
+    crate::sounds::play(st, if offset > 0.0 { crate::sounds::Cue::Resume } else { crate::sounds::Cue::Start });
     live_loop(st.clone(), m.id.clone(), offset, stop);
     crate::refresh_tray(st);
     st.meeting_changed(&m.id);
@@ -120,6 +125,7 @@ pub fn pause(st: &St, paused: bool) {
     if let Some(s) = st.session.lock().as_ref() {
         if let Some(c) = &s.cap {
             if paused { c.pause() } else { c.resume() }
+            crate::sounds::play(st, if paused { crate::sounds::Cue::Pause } else { crate::sounds::Cue::Resume });
             let _ = st.db.set(&s.meeting_id, "status", if paused { "paused" } else { "recording" });
             st.meeting_changed(&s.meeting_id);
         }
@@ -131,6 +137,7 @@ pub fn pause(st: &St, paused: bool) {
 pub fn stop(st: &St) -> Option<String> {
     let sess = st.session.lock().take()?;
     sess.stop.store(true, Ordering::SeqCst);
+    crate::sounds::play(st, crate::sounds::Cue::Stop);
     let id = sess.meeting_id.clone();
     let auto = sess.auto;
     let cap = sess.cap;
@@ -204,6 +211,10 @@ fn live_loop(st: St, id: String, offset: f64, stop: Arc<AtomicBool>) {
                 got = true;
                 if let Some(s) = st.session.lock().as_mut() {
                     s.last_voice = Instant::now();
+                    s.asked_still_there = false;
+                    if system {
+                        s.last_them = Instant::now();
+                    }
                 }
                 match transcribe_live(&st, &c, &prompt[system as usize]).await {
                     Ok(segs) => {
@@ -250,12 +261,37 @@ fn live_loop(st: St, id: String, offset: f64, stop: Arc<AtomicBool>) {
     });
 }
 
-/// Stops after 15 minutes with no speech on either side (Granola does the same).
+/// After 14 minutes with no speech on either side the pill asks "Still there?"; at 15
+/// minutes it stops (Granola does the same).
 fn auto_stop_check(st: &St, id: &str) {
-    let idle = st.session.lock().as_ref().filter(|s| s.meeting_id == id).map(|s| s.last_voice.elapsed() > Duration::from_secs(15 * 60)).unwrap_or(false);
+    let (idle, ask) = {
+        let mut g = st.session.lock();
+        match g.as_mut().filter(|s| s.meeting_id == id) {
+            Some(s) => {
+                let e = s.last_voice.elapsed();
+                let ask = e > Duration::from_secs(14 * 60) && !s.asked_still_there;
+                if ask {
+                    s.asked_still_there = true;
+                }
+                (e > Duration::from_secs(15 * 60), ask)
+            }
+            None => (false, false),
+        }
+    };
+    if ask {
+        crate::show_still_there(st);
+    }
     if idle {
         log::info!("auto-stop: 15 minutes of silence");
         stop(st);
+    }
+}
+
+/// "Yes, keep going" from the pill.
+pub fn still_here(st: &St) {
+    if let Some(s) = st.session.lock().as_mut() {
+        s.last_voice = Instant::now();
+        s.asked_still_there = false;
     }
 }
 

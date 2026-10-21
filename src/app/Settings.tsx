@@ -121,8 +121,14 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
               <option value="nothing">Do nothing</option>
             </select>
           </Row>
-          <Row title="Stop when the call ends" desc="20 seconds after the call app lets go of the microphone, or after 15 minutes of silence. Notes are written right away.">
+          <Row title="Stop when the call ends" desc="When the call app lets go of the microphone and the call has gone quiet, at the meeting's scheduled end, or after 15 minutes of silence (you're asked first). Notes are written right away.">
             <Toggle on={s.auto_stop} onChange={(v) => save({ auto_stop: v })} />
+          </Row>
+          <Row title="Live meeting indicator" desc="A small floating control while notes are being taken and Cereal isn't in front. Always shown for recordings that start by themselves.">
+            <Toggle on={s.show_indicator} onChange={(v) => save({ show_indicator: v })} />
+          </Row>
+          <Row title="Sounds" desc="A short chime when notes start, pause, resume and stop.">
+            <Toggle on={s.sounds} onChange={(v) => save({ sounds: v })} />
           </Row>
           <Row title="Move Cereal beside the call" desc="When you join a meeting from Cereal, the note opens next to the call window.">
             <Toggle on={s.reposition} onChange={(v) => save({ reposition: v })} />
@@ -218,7 +224,7 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
               </button>
             </div>
           </div>
-          <Row title="Remind me a minute before meetings" desc="For calendar meetings with 2 or more people.">
+          <Row title="Remind me a minute before meetings" desc="For calendar meetings with other people that you haven't declined.">
             <Toggle on={s.calendar_popups} onChange={(v) => save({ calendar_popups: v })} />
           </Row>
         </Section>

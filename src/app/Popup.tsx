@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 import { api, CalEvent, Call, on, Settings } from "../api";
 import { copy, Icon, LOGO, useTheme } from "./ui";
 
-type Mode = { kind: "ask"; call: Call } | { kind: "auto"; app: string; meetingId: string; consent: boolean } | { kind: "event"; event: CalEvent };
+type Mode = { kind: "ask"; call: Call } | { kind: "auto"; app: string; meetingId: string; consent: boolean } | { kind: "event"; event: CalEvent } | { kind: "still" };
+
+const hm = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 /** The small card in the top-right corner. */
 export default function Popup() {
   const [mode, setMode] = useState<Mode | null>(null);
   const [busy, setBusy] = useState(false);
   const [s, setS] = useState<Settings | null>(null);
+  const [ev, setEv] = useState<CalEvent | null>(null);
   useTheme(s?.theme);
   useEffect(() => {
     api.getSettings().then(setS);
@@ -16,10 +19,12 @@ export default function Popup() {
     const a = on<Call>("detected", (c) => (setMode({ kind: "ask", call: c }), setBusy(false)));
     const b = on<{ app: string; meetingId: string; consent: boolean }>("auto-started", (x) => (setMode({ kind: "auto", ...x }), setBusy(false), api.getSettings().then(setS)));
     const c = on<{ event: CalEvent }>("event-starting", (x) => (setMode({ kind: "event", event: x.event }), setBusy(false)));
+    const d = on("still-there", () => (setMode({ kind: "still" }), setBusy(false)));
     return () => {
       a();
       b();
       c();
+      d();
     };
   }, []);
   // An "auto-started" card without the consent note fades after 8 seconds.
@@ -30,7 +35,41 @@ export default function Popup() {
     }
   }, [mode]);
 
+  // A detected call during a calendar meeting is titled with that meeting.
+  useEffect(() => {
+    if (mode?.kind === "ask") api.currentEvent().then(setEv).catch(() => setEv(null));
+  }, [mode]);
+  // A calendar card goes away 4 minutes after the meeting starts.
+  useEffect(() => {
+    if (mode?.kind !== "event") return;
+    const ms = new Date(mode.event.start).getTime() + 4 * 60_000 - Date.now();
+    const t = setTimeout(() => api.popupAction(false).catch(() => {}), Math.max(0, ms));
+    return () => clearTimeout(t);
+  }, [mode]);
+
   if (!mode) return <div className="popup adhoc" />;
+
+  if (mode.kind === "still") {
+    return (
+      <div className="popup adhoc">
+        <div className="popup-head">
+          <img src={LOGO} alt="" />
+          <div style={{ minWidth: 0 }}>
+            <div className="popup-title">Still there?</div>
+            <div className="popup-sub">Nobody has spoken for a while. Cereal stops in a minute.</div>
+          </div>
+        </div>
+        <div className="popup-actions">
+          <button className="btn ghost" onClick={() => api.recordStop().then(() => api.popupAction(false))}>
+            Stop
+          </button>
+          <button className="btn dark" onClick={() => api.stillHere()}>
+            Keep going
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (mode.kind === "auto") {
     return (
@@ -70,7 +109,8 @@ export default function Popup() {
           <div style={{ minWidth: 0 }}>
             <div className="popup-title">{e.title}</div>
             <div className="popup-sub">
-              Starting now{e.attendees.length ? ` · ${e.attendees.length} people` : ""}
+              {hm(e.start)}–{hm(e.end)}
+              {e.attendees.length ? ` · ${e.attendees.length} ${e.attendees.length === 1 ? "person" : "people"}` : ""}
             </div>
           </div>
         </div>
@@ -94,14 +134,14 @@ export default function Popup() {
   }
 
   const app = mode.call.app;
-  const label = app.includes("huddle") ? "Huddle detected" : app.startsWith("A browser") ? "Call detected" : "Meeting detected";
+  const label = /huddle/i.test(app) ? "Huddle detected" : /^(A browser|FaceTime|WhatsApp|Signal|Telegram)/.test(app) ? "Call detected" : "Meeting detected";
   return (
     <div className="popup adhoc">
       <div className="popup-head">
         <img src={LOGO} alt="" />
         <div style={{ minWidth: 0 }}>
-          <div className="popup-title">{label}</div>
-          <div className="popup-sub">{app} is using your microphone</div>
+          <div className="popup-title">{ev ? ev.title : label}</div>
+          <div className="popup-sub">{ev ? `${hm(ev.start)}–${hm(ev.end)} · ${app}` : `${app} is using your microphone`}</div>
         </div>
       </div>
       <div className="popup-actions">

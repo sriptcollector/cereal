@@ -239,7 +239,12 @@ pub fn join_event(app: AppHandle, st: State<St>, event_id: String, record: bool)
     if let Some(ev) = calendar::events().into_iter().find(|x| x.id == event_id) {
         if !ev.link.is_empty() {
             use tauri_plugin_opener::OpenerExt;
-            let _ = app.opener().open_url(&ev.link, None::<&str>);
+            let zoom = calendar::app_link(&ev.link);
+            if zoom != ev.link && zoom_installed() && app.opener().open_url(&zoom, None::<&str>).is_ok() {
+                // Opened in the Zoom app.
+            } else {
+                let _ = app.opener().open_url(&ev.link, None::<&str>);
+            }
         }
     }
     let m = if record { crate::recorder::start(&st, Some(m.id.clone()), "", "").map_err(e)? } else { m };
@@ -248,6 +253,23 @@ pub fn join_event(app: AppHandle, st: State<St>, event_id: String, record: bool)
     }
     crate::show_hub(&app, Some(&format!("meeting:{}", m.id)));
     Ok(m)
+}
+
+/// Is the Zoom app installed (so zoommtg:// links open it)?
+fn zoom_installed() -> bool {
+    #[cfg(windows)]
+    {
+        use winreg::{enums::*, RegKey};
+        RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\Classes\zoommtg").is_ok() || RegKey::predef(HKEY_CLASSES_ROOT).open_subkey("zoommtg").is_ok()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::path::Path::new("/Applications/zoom.us.app").exists()
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        false
+    }
 }
 
 #[tauri::command]

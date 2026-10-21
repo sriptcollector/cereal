@@ -32,6 +32,8 @@ export interface Settings {
   calendars: CalendarSrc[];
   calendar_popups: boolean;
   reposition: boolean;
+  sounds: boolean;
+  show_indicator: boolean;
   transcript_retention: string;
   theme: "system" | "light" | "dark";
   beta: boolean;
@@ -92,6 +94,7 @@ export interface CalEvent {
   link: string;
   calendar: string;
   description: string;
+  declined: boolean;
 }
 
 export interface Folder {
@@ -314,6 +317,8 @@ export const api = {
   account: () => invoke<Account | null>("toolbay_account"),
   syncStatus: () => invoke<[boolean, boolean]>("sync_status"),
   pillClick: () => invoke<void>("pill_click"),
+  stillHere: () => invoke<void>("still_here"),
+  currentEvent: () => invoke<CalEvent | null>("current_event"),
 };
 
 function toSnake(s: string) {

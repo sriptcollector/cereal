@@ -39,6 +39,9 @@ pub struct Event {
     pub link: String,
     pub calendar: String,
     pub description: String,
+    /// The calendar's owner said no (no popup, like Granola).
+    #[serde(default)]
+    pub declined: bool,
 }
 
 static EVENTS: Lazy<Mutex<Vec<Event>>> = Lazy::new(|| Mutex::new(vec![]));
@@ -138,13 +141,44 @@ fn windows_tz(name: &str) -> Option<chrono_tz::Tz> {
 }
 
 fn find_link(text: &str) -> String {
-    let pats = ["zoom.us/j/", "zoom.us/my/", "meet.google.com/", "teams.microsoft.com/l/meetup-join", "teams.live.com/meet", ".webex.com/", "whereby.com/", "meet.jit.si/"];
+    let pats = [
+        "zoom.us/j/", "zoom.us/my/", "zoom.us/w/", "zoomgov.com/j/", "zoom.com/j/", "meet.google.com/", "teams.microsoft.com/l/meetup-join", "teams.live.com/meet",
+        ".webex.com/", "whereby.com/", "meet.jit.si/", "pexip.me/", "calendly.com/events/", "app.cal.com/video/", "riverside.com/", "riverside.fm/",
+    ];
     for w in text.split(|c: char| c.is_whitespace() || c == '<' || c == '>' || c == '"' || c == '(' || c == ')') {
+        let w = unwrap_safelink(w);
         if w.starts_with("http") && pats.iter().any(|p| w.contains(p)) {
             return w.trim_end_matches(['.', ',', ';']).to_string();
         }
     }
     String::new()
+}
+
+/// Outlook wraps links as https://*.safelinks.protection.outlook.com/?url=<encoded>&...
+fn unwrap_safelink(w: &str) -> String {
+    if !w.contains("safelinks.protection.outlook.com") {
+        return w.to_string();
+    }
+    let Some(i) = w.find("url=") else { return w.to_string() };
+    let enc = w[i + 4..].split('&').next().unwrap_or("");
+    urlencoding::decode(enc).map(|c| c.into_owned()).unwrap_or_else(|_| w.to_string())
+}
+
+/// Zoom links open straight in the Zoom app (like Granola), falling back to the web link.
+pub fn app_link(link: &str) -> String {
+    let Ok(u) = url::Url::parse(link) else { return link.to_string() };
+    let host = u.host_str().unwrap_or("");
+    if !(host.ends_with("zoom.us") || host.ends_with("zoom.com") || host.ends_with("zoomgov.com")) {
+        return link.to_string();
+    }
+    let segs: Vec<&str> = u.path_segments().map(|s| s.collect()).unwrap_or_default();
+    let Some(id) = segs.iter().position(|s| *s == "j").and_then(|i| segs.get(i + 1)) else { return link.to_string() };
+    let pwd = u.query_pairs().find(|(k, _)| k == "pwd").map(|(_, v)| v.into_owned());
+    let mut out = format!("zoommtg://{host}/join?action=join&confno={id}");
+    if let Some(p) = pwd {
+        out.push_str(&format!("&pwd={p}"));
+    }
+    out
 }
 
 struct Raw {
@@ -161,6 +195,7 @@ struct Raw {
     exdates: Vec<DateTime<Utc>>,
     recurrence_id: Option<DateTime<Utc>>,
     cancelled: bool,
+    declined: bool,
 }
 
 fn weekday(s: &str) -> Option<Weekday> {
@@ -273,8 +308,16 @@ fn expand(r: &Raw, from: DateTime<Utc>, to: DateTime<Utc>) -> Vec<DateTime<Utc>>
 pub fn parse(ics: &str, calendar: &str, from: DateTime<Utc>, to: DateTime<Utc>) -> Vec<Event> {
     let mut raws: Vec<Raw> = vec![];
     let mut cur: Option<Raw> = None;
+    let mut owner = String::new();
     for line in unfold(ics) {
         let l = line.trim_end();
+        if cur.is_none() {
+            if let Some(v) = l.strip_prefix("X-WR-CALNAME:") {
+                if v.contains('@') {
+                    owner = v.trim().to_lowercase();
+                }
+            }
+        }
         if l == "BEGIN:VEVENT" {
             cur = Some(Raw {
                 uid: String::new(),
@@ -290,6 +333,7 @@ pub fn parse(ics: &str, calendar: &str, from: DateTime<Utc>, to: DateTime<Utc>) 
                 exdates: vec![],
                 recurrence_id: None,
                 cancelled: false,
+                declined: false,
             });
             continue;
         }
@@ -337,6 +381,10 @@ pub fn parse(ics: &str, calendar: &str, from: DateTime<Utc>, to: DateTime<Utc>) 
                 if param(&p, "CUTYPE").map(|c| c == "RESOURCE" || c == "ROOM").unwrap_or(false) {
                     continue;
                 }
+                // A private feed is named after its owner (Google: the email address).
+                if p.name == "ATTENDEE" && !owner.is_empty() && email == owner && param(&p, "PARTSTAT").map(|v| v.eq_ignore_ascii_case("DECLINED")).unwrap_or(false) {
+                    r.declined = true;
+                }
                 let entry = if name.is_empty() || name.eq_ignore_ascii_case(&email) { email.clone() } else { format!("{name} <{email}>") };
                 if !r.attendees.iter().any(|a| a.contains(&email)) {
                     r.attendees.push(entry);
@@ -371,6 +419,7 @@ pub fn parse(ics: &str, calendar: &str, from: DateTime<Utc>, to: DateTime<Utc>) 
                 link,
                 calendar: calendar.to_string(),
                 description: r.description.chars().take(2000).collect(),
+                declined: r.declined,
             });
         }
     }
@@ -393,6 +442,7 @@ fn clone_raw(r: &Raw) -> Raw {
         exdates: r.exdates.clone(),
         recurrence_id: r.recurrence_id,
         cancelled: r.cancelled,
+        declined: r.declined,
     }
 }
 
@@ -421,17 +471,27 @@ pub async fn refresh(st: &St) -> anyhow::Result<usize> {
     Ok(n)
 }
 
-/// The event happening now (or that started up to 15 minutes ago / starts within 5).
+/// The meeting a recording belongs to: started at most 15 minutes ago and still on,
+/// or starting within the next 90 seconds (the latest such event wins).
 pub fn current_event() -> Option<Event> {
     let now = Utc::now();
-    events().into_iter().filter(|e| !e.all_day).find(|e| {
-        let s = DateTime::parse_from_rfc3339(&e.start).map(|d| d.with_timezone(&Utc)).ok();
-        let en = DateTime::parse_from_rfc3339(&e.end).map(|d| d.with_timezone(&Utc)).ok();
-        match (s, en) {
-            (Some(s), Some(en)) => now >= s - Duration::minutes(5) && (now <= en || now <= s + Duration::minutes(15)),
-            _ => false,
-        }
-    })
+    events()
+        .into_iter()
+        .filter(|e| !e.all_day)
+        .filter(|e| {
+            let s = DateTime::parse_from_rfc3339(&e.start).map(|d| d.with_timezone(&Utc)).ok();
+            let en = DateTime::parse_from_rfc3339(&e.end).map(|d| d.with_timezone(&Utc)).ok();
+            match (s, en) {
+                (Some(s), Some(en)) => s <= now + Duration::seconds(90) && s >= now - Duration::minutes(15) && (now <= en || s > now),
+                _ => false,
+            }
+        })
+        .last()
+}
+
+/// The linked event's end, for auto-stop.
+pub fn event_end(id: &str) -> Option<DateTime<Utc>> {
+    events().into_iter().find(|e| e.id == id).and_then(|e| DateTime::parse_from_rfc3339(&e.end).ok()).map(|d| d.with_timezone(&Utc))
 }
 
 pub fn next_event() -> Option<Event> {
@@ -439,7 +499,7 @@ pub fn next_event() -> Option<Event> {
     events().into_iter().find(|e| !e.all_day && e.start > now)
 }
 
-/// Background: refresh every 10 minutes; a minute before a meeting with 2+ people,
+/// Background: refresh every 10 minutes; a minute before a meeting with other people,
 /// offer to take notes (or start, if the user chose automatic recording).
 pub fn start(st: St) {
     tauri::async_runtime::spawn(async move {
@@ -458,15 +518,18 @@ pub fn start(st: St) {
             };
             if popups && onboarded && st.session.lock().is_none() {
                 let now = Utc::now();
+                // Granola: at least one other person, not declined, not all-day; shown 58 s
+                // before the start (or late, up to 4 minutes in), one event per pass.
                 for e in events() {
-                    if e.all_day || e.attendees.len() < 2 {
+                    if e.all_day || e.declined || e.attendees.is_empty() || e.title.trim().is_empty() {
                         continue;
                     }
                     let Ok(s) = DateTime::parse_from_rfc3339(&e.start) else { continue };
                     let secs = (s.with_timezone(&Utc) - now).num_seconds();
-                    if (0..=65).contains(&secs) && ANNOUNCED.lock().insert(e.id.clone()) {
+                    if (-240..=58).contains(&secs) && ANNOUNCED.lock().insert(e.id.clone()) {
                         log::info!("meeting starting soon: {}", e.title);
                         crate::show_event_popup(&st, &e);
+                        break;
                     }
                 }
             }
@@ -495,5 +558,21 @@ mod tests {
         let lunch = ev.iter().find(|e| e.uid == "x2").unwrap();
         assert!(lunch.all_day);
         assert_eq!(lunch.link, "https://meet.google.com/abc-defg-hij");
+    }
+
+    #[test]
+    fn links() {
+        assert_eq!(app_link("https://us02web.zoom.us/j/123456789?pwd=abc"), "zoommtg://us02web.zoom.us/join?action=join&confno=123456789&pwd=abc");
+        assert_eq!(app_link("https://meet.google.com/abc-defg-hij"), "https://meet.google.com/abc-defg-hij");
+        let wrapped = "https://nam02.safelinks.protection.outlook.com/?url=https%3A%2F%2Fzoom.us%2Fj%2F42&data=x";
+        assert_eq!(find_link(&format!("Join {wrapped} now")), "https://zoom.us/j/42");
+    }
+
+    #[test]
+    fn declined_by_owner() {
+        let ics = ["BEGIN:VCALENDAR", "X-WR-CALNAME:me@acme.com", "BEGIN:VEVENT", "UID:d1", "SUMMARY:Sync", "DTSTART:20261020T170000Z", "DTEND:20261020T173000Z", "ATTENDEE;CN=Me;PARTSTAT=DECLINED:mailto:me@acme.com", "ATTENDEE;CN=Dana:mailto:dana@acme.com", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+        let from = DateTime::parse_from_rfc3339("2026-10-19T00:00:00Z").unwrap().with_timezone(&Utc);
+        let ev = parse(&ics, "Work", from, from + Duration::days(3));
+        assert!(ev[0].declined);
     }
 }
