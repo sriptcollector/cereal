@@ -17,6 +17,7 @@ mod logging;
 mod notes;
 mod process;
 mod recorder;
+mod screens;
 mod settings;
 mod sounds;
 mod state;
@@ -198,7 +199,19 @@ pub fn hide_popup(st: &St) {
 // ---------------- floating recording pill ----------------
 
 const PILL_W: f64 = 64.0;
-const PILL_H: f64 = 188.0;
+const PILL_H: f64 = 268.0;
+/// With live captions open the pill grows to the left.
+const PILL_WIDE: f64 = 400.0;
+
+pub fn pill_wide(app: &AppHandle, wide: bool) {
+    let Some(p) = app.get_webview_window("pill") else { return };
+    let (Ok(pos), Ok(size), Ok(Some(mon))) = (p.outer_position(), p.outer_size(), p.current_monitor()) else { return };
+    let s = mon.scale_factor();
+    let w = ((if wide { PILL_WIDE } else { PILL_W }) * s) as u32;
+    let right = pos.x + size.width as i32;
+    let _ = p.set_size(PhysicalSize::new(w, size.height));
+    let _ = p.set_position(PhysicalPosition::new(right - w as i32, pos.y));
+}
 
 /// While recording and the main window isn't in front, a small pill on the right edge
 /// shows that notes are being taken; click it to come back.
@@ -426,6 +439,8 @@ pub fn run() {
             commands::sync_status,
             commands::pill_click,
             commands::still_here,
+            commands::pill_wide,
+            commands::screenshot,
             commands::current_event,
             commands::set_app_rule,
             library_cmds::folders_list,

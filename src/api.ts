@@ -318,6 +318,8 @@ export const api = {
   syncStatus: () => invoke<[boolean, boolean]>("sync_status"),
   pillClick: () => invoke<void>("pill_click"),
   stillHere: () => invoke<void>("still_here"),
+  pillWide: (wide: boolean) => invoke<void>("pill_wide", { wide }),
+  screenshot: () => invoke<void>("screenshot"),
   currentEvent: () => invoke<CalEvent | null>("current_event"),
 };
 

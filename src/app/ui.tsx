@@ -280,4 +280,6 @@ export const Icon = {
   upload: s(<path d="M10 13V3.5M6.5 7L10 3.5 13.5 7M4 13v3.5h12V13" />),
   feedback: s(<path d="M4 4.5h12v9H9l-3.5 3v-3H4zM7.5 8.5h5M7.5 11h3" />),
   stop: s(<rect x="6" y="6" width="8" height="8" rx="1.5" />),
+  camera: s(<path d="M3.5 7a1 1 0 0 1 1-1h2.2l1.2-1.8h4.2L13.3 6h2.2a1 1 0 0 1 1 1v7.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM10 13.2a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2z" />),
+  captions: s(<path d="M3.5 5.5h13v9h-13zM6.5 9.2h3M11 9.2h2.5M6.5 11.8h2M10 11.8h3.5" />),
 };

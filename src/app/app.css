@@ -2039,9 +2039,41 @@ button.pill:hover {
   top: 6px;
   right: 6px;
 }
+.fpill-wrap {
+  display: flex;
+  gap: 6px;
+  height: 100vh;
+  justify-content: flex-end;
+}
+.fcaptions {
+  flex: 1;
+  margin: 4px 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: var(--raise);
+  box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.fcaptions .cap b {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.fpill .ctl.on {
+  background: var(--hover);
+  color: var(--ink);
+}
 .fpill {
   margin: 4px;
-  width: calc(100vw - 8px);
+  width: 56px;
+  flex: none;
   height: calc(100vh - 8px);
   display: flex;
   flex-direction: column;

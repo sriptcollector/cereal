@@ -376,6 +376,18 @@ pub fn sync_status(st: State<St>) -> (bool, bool) {
     (crate::account::token().is_some(), crate::sync::available(&st))
 }
 
+/// Live captions open/closed on the floating indicator.
+#[tauri::command]
+pub fn pill_wide(app: AppHandle, wide: bool) {
+    crate::pill_wide(&app, wide);
+}
+
+/// Camera button: the screen goes into the note being recorded.
+#[tauri::command]
+pub fn screenshot(st: State<St>) -> R<()> {
+    crate::screens::screenshot_into_note(&st).map(|_| ()).map_err(e)
+}
+
 /// "Keep going" on the Still there? card.
 #[tauri::command]
 pub fn still_here(st: State<St>) {
