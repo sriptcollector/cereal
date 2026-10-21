@@ -1,0 +1,45 @@
+name: mac-check
+
+# Checks a published release the way a user gets it: download the DMG, mark it as
+# downloaded from the internet, copy the app to /Applications, then ask Gatekeeper.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to check
+        required: true
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, x64]
+    runs-on: macos-latest
+    steps:
+      - name: Check ${{ inputs.tag }} (${{ matrix.arch }})
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          sw_vers
+          gh release download "${{ inputs.tag }}" -R "${{ github.repository }}" -p "*_${{ matrix.arch }}.dmg" -D dl
+          dmg=$(ls dl/*.dmg)
+          xattr -w com.apple.quarantine "0081;$(printf %x $(date +%s));Safari;" "$dmg"
+          mnt=$(hdiutil attach -nobrowse -readonly "$dmg" | tail -1 | awk -F'\t' '{print $NF}')
+          ditto "$mnt/Cereal.app" /Applications/Cereal.app
+          hdiutil detach "$mnt"
+          app=/Applications/Cereal.app
+          xattr -w com.apple.quarantine "0081;$(printf %x $(date +%s));Safari;" "$app"
+          echo "== codesign verify"; codesign --verify --deep --strict --verbose=4 "$app"; echo "exit $?"
+          echo "== codesign details"; codesign -dvvv "$app" 2>&1
+          echo "== spctl"; spctl -a -vvv -t exec "$app"; echo "exit $?"
+          echo "== syspolicy_check"; syspolicy_check distribution "$app"; echo "exit $?"
+          echo "== Mach-O files in the bundle and their signatures"
+          find "$app" -type f | while read -r f; do
+            if file "$f" | grep -q Mach-O; then
+              s=$(codesign -dv "$f" 2>&1 | grep -E "^Signature|not signed" | head -1)
+              echo "$f :: $(file -b "$f" | cut -c1-60) :: ${s:-?}"
+            fi
+          done
