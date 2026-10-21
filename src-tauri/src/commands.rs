@@ -101,20 +101,7 @@ pub fn meeting_update(st: State<St>, id: String, field: String, value: String) -
     st.db.set(&id, &field, &value).map_err(e)
 }
 
-#[tauri::command]
-pub fn meeting_delete(st: State<St>, id: String) -> R<()> {
-    if crate::recorder::recording_id(&st).as_deref() == Some(id.as_str()) {
-        crate::recorder::stop(&st);
-    }
-    st.db.delete_meeting(&id).map_err(e)?;
-    let _ = std::fs::remove_dir_all(st.meetings_dir().join(&id));
-    Ok(())
-}
 
-#[tauri::command]
-pub fn folders(st: State<St>) -> R<Vec<String>> {
-    st.db.folders().map_err(e)
-}
 
 #[tauri::command]
 pub fn rename_speaker(st: State<St>, id: String, speaker: String, name: String) -> R<()> {
@@ -234,20 +221,8 @@ pub fn search(st: State<St>, q: String) -> R<Vec<crate::db::Hit>> {
     st.db.search(&q, 50).map_err(e)
 }
 
-#[tauri::command]
-pub fn chat_list(st: State<St>, meeting_id: Option<String>) -> R<Vec<crate::db::ChatMsg>> {
-    st.db.chats(meeting_id.as_deref()).map_err(e)
-}
 
-#[tauri::command]
-pub async fn chat_ask(st: State<'_, St>, meeting_id: Option<String>, question: String, request_id: String) -> R<String> {
-    crate::notes::ask(&st, meeting_id, &question, &request_id).await.map_err(|err| format!("{err:#}"))
-}
 
-#[tauri::command]
-pub fn chat_clear(st: State<St>, meeting_id: Option<String>) -> R<()> {
-    st.db.clear_chat(meeting_id.as_deref()).map_err(e)
-}
 
 // ---------------- audio & models ----------------
 
@@ -362,7 +337,7 @@ pub fn export_markdown(app: AppHandle, name: String, content: String) -> R<Strin
     Ok(p.to_string_lossy().to_string())
 }
 
-fn reveal(p: &std::path::Path) {
+pub fn reveal(p: &std::path::Path) {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -398,11 +373,52 @@ pub async fn toolbay_account() -> Option<crate::hub::Account> {
 
 #[tauri::command]
 pub fn sync_status(st: State<St>) -> (bool, bool) {
-    (std::env::var("TOOLBAY_TOKEN").map(|t| !t.is_empty()).unwrap_or(false), crate::sync::available(&st))
+    (crate::account::token().is_some(), crate::sync::available(&st))
 }
 
 #[tauri::command]
 pub fn pill_click(app: AppHandle, st: State<St>) {
     let page = crate::recorder::recording_id(&st).map(|id| format!("meeting:{id}"));
     crate::show_hub(&app, page.as_deref());
+}
+
+/// Per-app rule from the popup or Settings: "record" | "ask" | "nothing" | "ignore" | "" (default).
+#[tauri::command]
+pub fn set_app_rule(st: State<St>, app: String, rule: String) -> R<()> {
+    let mut s = st.settings.read().clone();
+    if rule.is_empty() {
+        s.app_rules.remove(&app);
+    } else {
+        s.app_rules.insert(app, rule);
+    }
+    st.save_settings(s).map_err(e)?;
+    crate::sync::push_settings(&st);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn feedback_info() -> bool {
+    crate::account::token().is_some()
+}
+
+/// In-app feedback to Cereal's space on toolbay.ai. Debug info only when the person ticks it.
+#[tauri::command]
+pub async fn feedback_send(st: State<'_, St>, kind: String, text: String, screenshot: Option<String>, include_debug: bool) -> R<String> {
+    let debug = if include_debug {
+        let s = st.settings.read().clone();
+        let hw = toolbay_engine::detect();
+        let log = std::fs::read_to_string(st.data_dir.join("cereal.log")).unwrap_or_default();
+        let tail: Vec<&str> = log.lines().rev().take(40).collect::<Vec<_>>().into_iter().rev().collect();
+        Some(serde_json::json!({
+            "gpu": hw.gpu_name, "vramMb": hw.vram_mb, "ramMb": hw.ram_mb, "threads": hw.threads,
+            "speechModel": s.speech_model, "llmModel": s.llm_model, "useGpu": s.use_gpu, "language": s.language,
+            "meetingStart": s.meeting_start, "captureSystem": s.capture_system,
+            "log": tail.join("
+").chars().take(9000).collect::<String>(),
+        }))
+    } else {
+        None
+    };
+    let vis = if include_debug && kind == "bug" { Some("maker".to_string()) } else { None };
+    crate::account::send_feedback(&kind, &text, screenshot, debug, vis).await.map_err(|err| format!("{err}"))
 }

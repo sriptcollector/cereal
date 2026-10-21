@@ -194,7 +194,23 @@ pub async fn enhance(st: &St, id: &str, template_id: Option<String>) -> Result<S
         parts
     };
     let my = if m.my_notes.trim().is_empty() { "(none)".to_string() } else { m.my_notes.trim().to_string() };
-    let user = format!("{}\n{}\nMY NOTES:\n{}\n\n{}", header(&m), template_block(&tpl), my, body);
+    let profile = {
+        let s = st.settings.read();
+        let mut p = String::new();
+        if !s.job_title.trim().is_empty() || !s.about.trim().is_empty() {
+            let jt = if s.job_title.trim().is_empty() { String::new() } else { format!(", {}", s.job_title.trim()) };
+            let ab = if s.about.trim().is_empty() { String::new() } else { format!(". {}", s.about.trim()) };
+            p.push_str(&format!("ABOUT THE USER: {me}{jt}{ab}\n"));
+        }
+        if !s.vocabulary.is_empty() {
+            p.push_str(&format!("SPELL THESE EXACTLY: {}\n", s.vocabulary.join(", ")));
+        }
+        if s.summary_language != "auto" && !s.summary_language.is_empty() {
+            p.push_str(&format!("WRITE THE NOTES IN LANGUAGE CODE: {}\n", s.summary_language));
+        }
+        p
+    };
+    let user = format!("{}{}\n{}\nMY NOTES:\n{}\n\n{}", profile, header(&m), template_block(&tpl), my, body);
     let sys = NOTES_SYSTEM.replace("{me}", &me);
     let id2 = id.to_string();
     let st2 = st.clone();
@@ -259,7 +275,7 @@ pub fn unbold(md: &str) -> String {
 
 // ---------------- chat ----------------
 
-const CHAT_SYSTEM: &str = "You answer questions about the user's meetings, using only the meeting material provided. The user is \"{me}\". Be direct and concise; use short bullets when listing. When you use something from a meeting, mention which meeting (title and date) if there are several. If the material doesn't contain the answer, say so plainly instead of guessing. If asked to write something (an email, a summary, a message), write it ready to copy.";
+const CHAT_SYSTEM: &str = "You answer questions about the user's meetings, using only the material provided. The user is \"{me}\". Be direct and concise; use short bullets when listing. Each source is numbered like [1]; when you use something from a source, cite it with its number in square brackets right after the sentence, e.g. [2]. If the material doesn't contain the answer, say so plainly instead of guessing. If asked to write something (an email, a summary, a message), write it ready to copy.";
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -268,8 +284,28 @@ struct ChatToken {
     text: String,
 }
 
-fn meeting_context(st: &St, m: &Meeting, budget_chars: usize, question: &str) -> String {
-    let mut s = format!("=== Meeting: {} ({})\n", if m.title.is_empty() { "Untitled" } else { &m.title }, m.created_at.get(..10).unwrap_or(""));
+#[derive(Clone, Serialize, serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Source {
+    pub n: usize,
+    pub meeting_id: String,
+    pub title: String,
+    pub date: String,
+}
+
+#[derive(Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Answer {
+    pub thread_id: String,
+    pub answer: String,
+    pub sources: Vec<Source>,
+}
+
+fn meeting_context(st: &St, m: &Meeting, budget_chars: usize, question: &str, n: usize) -> String {
+    let mut s = format!("=== [{n}] Meeting: {} ({})\n", if m.title.is_empty() { "Untitled" } else { &m.title }, m.created_at.get(..10).unwrap_or(""));
+    if !m.attendees.trim().is_empty() {
+        s.push_str(&format!("Attendees: {}\n", m.attendees.trim()));
+    }
     if !m.enhanced.trim().is_empty() {
         s.push_str(&format!("Notes:\n{}\n", m.enhanced.trim()));
     }
@@ -281,7 +317,9 @@ fn meeting_context(st: &St, m: &Meeting, budget_chars: usize, question: &str) ->
     let room = budget_chars.saturating_sub(s.len());
     let full = lines.join("\n");
     if full.len() <= room {
-        s.push_str(&format!("Transcript:\n{full}\n"));
+        if !full.is_empty() {
+            s.push_str(&format!("Transcript:\n{full}\n"));
+        }
     } else if room > 500 {
         // Keep the lines that share words with the question, plus their neighbours.
         let q: Vec<String> = question.to_lowercase().split(|c: char| !c.is_alphanumeric()).filter(|w| w.len() > 3).map(String::from).collect();
@@ -302,58 +340,127 @@ fn meeting_context(st: &St, m: &Meeting, budget_chars: usize, question: &str) ->
             }
         }
         if picked.is_empty() {
-            picked = full.chars().take(room).collect();
+            // The most recent lines are the best guess for "what did I miss".
+            picked = full.chars().rev().take(room).collect::<Vec<_>>().into_iter().rev().collect();
         }
         s.push_str(&format!("Transcript excerpts:\n{picked}\n"));
     }
     s
 }
 
-/// Answers a question about one meeting (`meeting_id`) or across all meetings,
-/// streaming the answer as "chat-token" events. Saves both sides of the exchange.
-pub async fn ask(st: &St, meeting_id: Option<String>, question: &str, request_id: &str) -> Result<String> {
-    let llm: Llm = crate::engine::llm(st).await?;
-    let budget = if llm.provider == Provider::Local { (crate::engine::llm_ctx(st).saturating_sub(3000)) * 3 } else { 200_000 };
-    let me = st.settings.read().me();
-    let context = match &meeting_id {
-        Some(id) => {
-            let m = st.db.meeting(id)?.ok_or_else(|| anyhow!("meeting not found"))?;
-            meeting_context(st, &m, budget, question)
-        }
-        None => {
+/// The meetings a chat scope covers, most relevant first.
+fn scope_meetings(st: &St, scope: &str, scope_id: &str, question: &str) -> Result<Vec<Meeting>> {
+    Ok(match scope {
+        "meeting" => st.db.meeting(scope_id)?.into_iter().collect(),
+        "folder" => st.db.meetings(Some(scope_id))?.into_iter().take(20).collect(),
+        "person" => st.db.meetings_with(Some(scope_id), None)?.into_iter().take(20).collect(),
+        "company" => st.db.meetings_with(None, Some(scope_id))?.into_iter().take(20).collect(),
+        "selected" => scope_id.split(',').filter_map(|id| st.db.meeting(id.trim()).ok().flatten()).collect(),
+        _ => {
             let mut ids = st.db.search_any(question, 6)?;
-            for m in st.db.meetings(None)?.into_iter().take(5) {
+            let ql = question.to_lowercase();
+            let recent_n = if ql.contains("week") || ql.contains("recent") || ql.contains("todo") || ql.contains("year") { 15 } else { 5 };
+            for m in st.db.meetings(None)?.into_iter().take(recent_n) {
                 if !ids.contains(&m.id) {
                     ids.push(m.id);
                 }
             }
-            let per = budget / ids.len().max(1);
-            let mut c = String::new();
-            for id in ids {
-                if let Ok(Some(m)) = st.db.meeting(&id) {
-                    c.push_str(&meeting_context(st, &m, per, question));
-                    c.push('\n');
-                }
-            }
-            if c.is_empty() { "(no meetings yet)".into() } else { c }
+            ids.into_iter().filter_map(|id| st.db.meeting(&id).ok().flatten()).collect()
         }
+    })
+}
+
+/// Answers in a chat thread (a new thread when `thread_id` is None), streaming
+/// "chat-token" events, with numbered sources the answer cites.
+pub async fn chat(st: &St, thread_id: Option<String>, scope: &str, scope_id: &str, question: &str, attachment: Option<String>, request_id: &str) -> Result<Answer> {
+    let llm: Llm = crate::engine::llm(st).await?;
+    let budget = if llm.provider == Provider::Local { (crate::engine::llm_ctx(st).saturating_sub(3000)) * 3 } else { 200_000 };
+    let me = st.settings.read().me();
+    let thread = match thread_id.and_then(|t| st.db.thread(&t).ok().flatten()) {
+        Some(t) => t,
+        None => st.db.create_thread(scope, scope_id, question)?,
     };
-    let history = st.db.chats(meeting_id.as_deref())?;
-    let mut msgs: Vec<Msg> = vec![msg("user", format!("MEETING MATERIAL:\n{context}\n\nI'll ask questions about this.")), msg("assistant", "Got it. What would you like to know?")];
+    let meetings = scope_meetings(st, &thread.scope, &thread.scope_id, question)?;
+    let per = budget / meetings.len().max(1);
+    let mut context = String::new();
+    let mut sources = vec![];
+    for (i, m) in meetings.iter().enumerate() {
+        context.push_str(&meeting_context(st, m, per, question, i + 1));
+        context.push('\n');
+        sources.push(Source { n: i + 1, meeting_id: m.id.clone(), title: if m.title.is_empty() { "Untitled meeting".into() } else { m.title.clone() }, date: m.created_at.clone() });
+    }
+    if thread.scope == "folder" {
+        for (name, text) in st.db.file_texts(&thread.scope_id)?.into_iter().take(5) {
+            context.push_str(&format!("=== File: {name}\n{}\n", text.chars().take(budget / 6).collect::<String>()));
+        }
+    }
+    if let Some(a) = attachment.filter(|a| !a.trim().is_empty()) {
+        context.push_str(&format!("=== Attached by the user:\n{}\n", a.chars().take(budget / 4).collect::<String>()));
+    }
+    if context.trim().is_empty() {
+        context = "(no meetings yet)".into();
+    }
+    let history = st.db.thread_msgs(&thread.id)?;
+    let mut msgs: Vec<Msg> = vec![msg("user", format!("MATERIAL:\n{context}\n\nI'll ask questions about this.")), msg("assistant", "Got it. What would you like to know?")];
     for h in history.iter().rev().take(6).rev() {
         msgs.push(Msg { role: if h.role == "user" { "user" } else { "assistant" }, content: h.content.clone() });
     }
     msgs.push(msg("user", question));
-    st.db.add_chat(meeting_id.as_deref(), "user", question)?;
+    st.db.add_thread_msg(&thread.id, "user", question)?;
     let rid = request_id.to_string();
     let st2 = st.clone();
     let answer = llm
-        .chat_stream(&CHAT_SYSTEM.replace("{me}", &me), &msgs, 1200, Duration::from_secs(600), &move |p: &str| {
+        .chat_stream(&CHAT_SYSTEM.replace("{me}", &me), &msgs, 1400, Duration::from_secs(600), &move |p: &str| {
             st2.emit("chat-token", ChatToken { request_id: rid.clone(), text: p.to_string() });
         })
         .await?;
-    st.db.add_chat(meeting_id.as_deref(), "assistant", &answer)?;
-    Ok(answer)
+    st.db.add_thread_msg(&thread.id, "assistant", &answer)?;
+    st.db.touch_thread(&thread.id)?;
+    // Keep only the sources the answer cites (for a single meeting, always that one).
+    let cited: Vec<Source> = sources.iter().filter(|s| answer.contains(&format!("[{}]", s.n))).cloned().collect();
+    let sources = if cited.is_empty() && thread.scope == "meeting" { sources } else { cited };
+    let _ = st.db.set_kv(&format!("sources:{}", thread.id), &serde_json::to_string(&sources).unwrap_or_default());
+    Ok(Answer { thread_id: thread.id, answer, sources })
+}
+
+/// Sources of the last answer in a thread (for showing citations again later).
+pub fn thread_sources(st: &St, thread_id: &str) -> Vec<Source> {
+    st.db.kv(&format!("sources:{thread_id}")).and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+}
+
+/// Headless --ask mode.
+pub async fn ask(st: &St, meeting_id: Option<String>, question: &str, request_id: &str) -> Result<String> {
+    let (scope, id) = match &meeting_id {
+        Some(m) => ("meeting", m.as_str()),
+        None => ("all", ""),
+    };
+    Ok(chat(st, None, scope, id, question, None, request_id).await?.answer)
+}
+
+/// Pre-meeting brief: 2-3 bullets from past notes with the same people.
+pub async fn brief(st: &St, attendees: &[String], title: &str) -> Result<String> {
+    let mut past: Vec<Meeting> = vec![];
+    for a in attendees {
+        let (_, email) = crate::library::parse_attendees(a).into_iter().next().unwrap_or_default();
+        if email.is_empty() {
+            continue;
+        }
+        for m in st.db.meetings_with(Some(&email), None)?.into_iter().take(4) {
+            if !past.iter().any(|p| p.id == m.id) {
+                past.push(m);
+            }
+        }
+    }
+    if past.is_empty() {
+        return Ok(String::new());
+    }
+    let llm = crate::engine::llm(st).await?;
+    let mut ctx = String::new();
+    for (i, m) in past.iter().take(6).enumerate() {
+        ctx.push_str(&meeting_context(st, m, 3000, title, i + 1));
+    }
+    let q = format!("I'm about to join \"{title}\". From these past meetings with the same people, give me 2-3 short bullets to prepare: open threads, commitments, what to follow up on. Bullets only, no citations.");
+    llm.chat("You prepare the user for a meeting using only their past notes. Be brief and specific.", &[msg("user", format!("{ctx}\n\n{q}"))], 400, Duration::from_secs(300)).await
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-//! A small local log file (notes.log in the app data folder, kept under ~2 MB) and
+//! A small local log file (cereal.log in the app data folder, kept under ~2 MB) and
 //! crash recovery: panics are logged, and on Windows the app asks to be restarted
 //! after a crash. Logs never leave the computer.
 
@@ -32,7 +32,7 @@ impl log::Log for FileLog {
 
 pub fn init(dir: &Path) {
     let _ = std::fs::create_dir_all(dir);
-    let logger = Box::leak(Box::new(FileLog { path: dir.join("notes.log"), lock: Mutex::new(()) }));
+    let logger = Box::leak(Box::new(FileLog { path: dir.join("cereal.log"), lock: Mutex::new(()) }));
     let _ = log::set_logger(logger).map(|()| log::set_max_level(log::LevelFilter::Info));
     let prev = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -45,5 +45,5 @@ pub fn init(dir: &Path) {
         use windows::Win32::System::Recovery::{RegisterApplicationRestart, REGISTER_APPLICATION_RESTART_FLAGS};
         let _ = RegisterApplicationRestart(windows::core::w!("--hidden"), REGISTER_APPLICATION_RESTART_FLAGS(0));
     }
-    log::info!("Toolbay Notes {} starting", env!("CARGO_PKG_VERSION"));
+    log::info!("Cereal {} starting", env!("CARGO_PKG_VERSION"));
 }

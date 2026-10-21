@@ -1,30 +1,30 @@
-<p align="center"><img src="app-icon.png" width="88" alt="Toolbay Notes"></p>
+<p align="center"><img src="app-icon.png" width="88" alt="Cereal"></p>
 
-<h1 align="center">Toolbay Notes</h1>
+<h1 align="center">Cereal</h1>
 
 <p align="center"><b>Free, local, open-source AI meeting notes. No bot joins your call.</b><br>
 Jot a few words during the meeting. When it ends, the AI on your computer turns them and the transcript<br>
 into clean notes with decisions and action items. No account. No limits. Nothing leaves your computer.</p>
 
 <p align="center"><sub>Inspired by <img src="src/assets/inspired-by/granola.svg" height="12" alt="Granola"> Granola<br>
-Toolbay Notes is an independent open-source project and is not affiliated with or endorsed by Granola.</sub></p>
+Cereal is an independent open-source project and is not affiliated with or endorsed by Granola.</sub></p>
 
 ---
 
-Toolbay Notes is the second free tool in the [Toolbay](https://toolbay.ai) collection: open-source rebuilds of paid
+Cereal is the second free tool in the [Toolbay](https://toolbay.ai) collection: open-source rebuilds of paid
 software. It records **your microphone** ("You") and **your computer's sound** ("everyone else") as two separate
 tracks, so it works with Zoom, Google Meet, Microsoft Teams, Slack huddles, Discord, Webex or a phone app, without
 inviting anything into the call. Speech recognition ([whisper.cpp](https://github.com/ggml-org/whisper.cpp)),
 speaker separation ([sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with pyannote segmentation) and the notes
 AI ([llama.cpp](https://github.com/ggml-org/llama.cpp) with an open Qwen model) all run on your own hardware.
 
-<p align="center"><img src="docs/screenshots/meeting.png" width="760" alt="Toolbay Notes meeting page with AI notes and transcript"></p>
+<p align="center"><img src="docs/screenshots/meeting.png" width="760" alt="Cereal meeting page with AI notes and transcript"></p>
 
 Written from scratch (Tauri 2 + Rust + React). No code, assets or services from any commercial product are used.
 
 ## Install
 
-**Windows 10/11:** download `Toolbay.Notes_x.y.z_x64-setup.exe` from [Releases](https://github.com/sriptcollector/toolbay-notes/releases/latest)
+**Windows 10/11:** download `Cereal_x.y.z_x64-setup.exe` from [Releases](https://github.com/sriptcollector/cereal/releases/latest)
 and double-click it. No admin prompt and nothing else to install: the speech, speaker and notes engines and a starter
 speech model are inside the installer. Notes picks the best AI models for your computer by itself and fetches them in
 the background (a gaming GPU gets Whisper Large v3 Turbo and Qwen3 4B; an ordinary laptop gets compact models).
@@ -40,7 +40,7 @@ installs Notes and its notes AI model in one step, and opens it.
 
 1. A call starts (any app that uses your microphone). A small popup asks **Take notes?** Nothing records until you click.
    Or click **New note** yourself.
-2. Toolbay Notes reminds you to tell the others and gives you a message to paste in the meeting chat
+2. Cereal reminds you to tell the others and gives you a message to paste in the meeting chat
    (in many places everyone must agree to be recorded).
 3. Type rough notes as the call goes. The live transcript fills in on the right: **You**, and the other side.
 4. When the call ends (Notes stops by itself 20 s after the call app releases the microphone), it re-transcribes the
@@ -84,8 +84,8 @@ The full checklist against Granola is in [docs/FEATURES.md](docs/FEATURES.md).
 
 ## Privacy
 
-Everything is stored in your app data folder (`%APPDATA%\ai.toolbay.notes` on Windows,
-`~/Library/Application Support/ai.toolbay.notes` on Mac): audio, transcripts, notes and the search index. The only
+Everything is stored in your app data folder (`%APPDATA%\ai.toolbay.cereal` on Windows,
+`~/Library/Application Support/ai.toolbay.cereal` on Mac): audio, transcripts, notes and the search index. The only
 network use is downloading AI models (Hugging Face, GitHub), Toolbay sync of settings/templates when you're signed in
 to the Toolbay app, and a cloud engine only if you add your own API key.
 

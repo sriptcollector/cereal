@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    toolbay_notes_lib::run()
+    cereal_lib::run()
 }

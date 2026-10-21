@@ -1,7 +1,7 @@
 //! Living under the Toolbay hub: show/hide/quit requests, running state, the
 //! signed-in Toolbay account, and the desktop shortcut.
 //!
-//! Control: the hub (or anyone) runs `toolbay-notes.exe --show | --hide | --quit`, and
+//! Control: the hub (or anyone) runs `cereal.exe --show | --hide | --quit`, and
 //! `--start` / `--stop` (take notes now / stop), `--open <page>` ("meeting:<id>", "settings"…).
 //! Notes is single-instance, so that second process forwards its arguments to the
 //! running one and exits. While hidden, Notes keeps working from the tray (and keeps
@@ -89,7 +89,7 @@ pub struct Account {
 /// The hub passes the user's toolbay.ai token in TOOLBAY_TOKEN. It's only held in
 /// memory and only sent to toolbay.ai.
 pub async fn account() -> Option<Account> {
-    let token = std::env::var("TOOLBAY_TOKEN").ok().filter(|t| !t.is_empty())?;
+    let token = crate::account::token()?;
     let r = reqwest::Client::new()
         .get("https://toolbay.ai/api/v1/me")
         .bearer_auth(token)

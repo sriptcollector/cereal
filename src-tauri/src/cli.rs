@@ -1,9 +1,9 @@
 //! Headless modes for testing and benchmarks (use the debug build; the release exe
 //! has no console):
 //!
-//!   toolbay-notes --record <secs> <dir>         record mic + system audio to <dir>
-//!   toolbay-notes --detect                      print calls using the mic right now
-//!   toolbay-notes --process <mic.wav> <system.wav> [template] [--notes "my notes"]
+//!   cereal --record <secs> <dir>         record mic + system audio to <dir>
+//!   cereal --detect                      print calls using the mic right now
+//!   cereal --process <mic.wav> <system.wav> [template] [--notes "my notes"]
 //!                                               full after-call pipeline, prints timings,
 //!                                               transcript and notes (uses the app's models)
 
@@ -17,8 +17,8 @@ fn data_dirs() -> (PathBuf, PathBuf) {
     } else {
         std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library").join("Application Support")).unwrap_or_default()
     };
-    // Same folders as the app (identifier ai.toolbay.notes), unless overridden.
-    let d = std::env::var_os("TOOLBAY_NOTES_DATA").map(PathBuf::from).unwrap_or_else(|| base.join("ai.toolbay.notes"));
+    // Same folders as the app (identifier ai.toolbay.cereal), unless overridden.
+    let d = std::env::var_os("CEREAL_DATA").map(PathBuf::from).unwrap_or_else(|| base.join("ai.toolbay.cereal"));
     (d.clone(), d)
 }
 

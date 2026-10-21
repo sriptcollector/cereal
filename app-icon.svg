@@ -6,16 +6,18 @@
     </linearGradient>
   </defs>
   <rect x="32" y="32" width="960" height="960" rx="224" fill="url(#bg)" stroke="#2f2f2f" stroke-width="8"/>
-  <!-- note page -->
-  <rect x="262" y="214" width="500" height="596" rx="72" fill="#fafafa"/>
-  <rect x="352" y="334" width="320" height="40" rx="20" fill="#0a0a0a"/>
-  <rect x="352" y="424" width="250" height="40" rx="20" fill="#0a0a0a"/>
-  <!-- voice line: the meeting being heard -->
-  <g fill="#8b6dff">
-    <rect x="352" y="560" width="40" height="80" rx="20"/>
-    <rect x="422" y="520" width="40" height="160" rx="20"/>
-    <rect x="492" y="548" width="40" height="104" rx="20"/>
-    <rect x="562" y="500" width="40" height="200" rx="20"/>
-    <rect x="632" y="572" width="40" height="56" rx="20"/>
+  <!-- cereal rings piled above the milk -->
+  <g fill="none" stroke-width="40">
+    <circle cx="372" cy="470" r="66" stroke="#f5b83d"/>
+    <circle cx="520" cy="410" r="66" stroke="#8b6dff"/>
+    <circle cx="664" cy="468" r="66" stroke="#ff7a5c"/>
+    <circle cx="452" cy="520" r="56" stroke="#3fc6a0"/>
+    <circle cx="590" cy="526" r="56" stroke="#f5b83d"/>
   </g>
+  <!-- milk -->
+  <ellipse cx="512" cy="560" rx="300" ry="54" fill="#efe9dc"/>
+  <!-- bowl -->
+  <path d="M212 560 h600 c0 170 -134 282 -300 282 s-300 -112 -300 -282 z" fill="#fafafa"/>
+  <rect x="412" y="828" width="200" height="40" rx="20" fill="#fafafa"/>
+  <path d="M262 622 c34 92 120 156 250 160" fill="none" stroke="#e4ddcc" stroke-width="22" stroke-linecap="round"/>
 </svg>

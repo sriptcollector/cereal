@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Shared local AI engine for Toolbay tools: model catalog, downloads, whisper.cpp / llama.cpp / sherpa-onnx runners, hardware detection and the optional cloud engines."
-repository = "https://github.com/sriptcollector/toolbay-notes"
+repository = "https://github.com/sriptcollector/cereal"
 
 [dependencies]
 anyhow = "1"

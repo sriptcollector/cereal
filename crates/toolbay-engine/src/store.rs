@@ -118,7 +118,7 @@ fn pkg_name(e: &EngineInfo) -> String {
 
 /// App data folders of the other Toolbay tools on this computer (read-only use).
 fn other_tools() -> Vec<PathBuf> {
-    let ids = ["ai.toolbay.flow", "ai.toolbay.notes"];
+    let ids = ["ai.toolbay.flow", "ai.toolbay.notes", "ai.toolbay.cereal"];
     let base = if cfg!(windows) {
         std::env::var_os("APPDATA").map(PathBuf::from)
     } else {

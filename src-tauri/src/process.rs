@@ -30,6 +30,7 @@ pub async fn run(st: &St, id: &str, template: Option<String>) {
         Ok(t) => {
             let _ = st.db.set(id, "status", "ready");
             let _ = st.db.set(id, "step", "");
+            crate::library_cmds::post_to_folder_webhook(st, id).await;
             log::info!("processed {id} in {:.1}s: {t:?}", t0.elapsed().as_secs_f64());
         }
         Err(e) => {
@@ -108,6 +109,30 @@ fn apply_audio_policy(st: &St, id: &str) {
             let _ = std::fs::remove_file(p.join("system.wav"));
         }
         let _ = st.db.set_has_audio(id, false);
+    }
+}
+
+/// Empties the trash of notes deleted more than 30 days ago, and applies the
+/// transcript retention setting.
+pub fn trash_pass(st: &St) {
+    for id in st.db.expired_trash().unwrap_or_default() {
+        let _ = st.db.delete_meeting(&id);
+        let _ = std::fs::remove_dir_all(st.meetings_dir().join(&id));
+    }
+    let days = match st.settings.read().transcript_retention.as_str() {
+        "1d" => 1,
+        "1w" => 7,
+        "1m" => 30,
+        "3m" => 91,
+        "6m" => 182,
+        "1y" => 365,
+        _ => return,
+    };
+    let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+    for m in st.db.meetings(None).unwrap_or_default() {
+        if m.created_at < cutoff && m.status != "recording" {
+            let _ = st.db.replace_segments(&m.id, &[]);
+        }
     }
 }
 
@@ -292,7 +317,8 @@ async fn transcribe_track(st: &St, audio: &[f32], on_progress: impl Fn(f64)) -> 
     }
     pieces.push((start, c.len()));
     let mut out: Vec<stt::Seg> = vec![];
-    let mut prompt = String::new();
+    let vocab = st.settings.read().vocabulary.join(", ");
+    let mut prompt = vocab.clone();
     for (k, (a, b)) in pieces.iter().enumerate() {
         on_progress(k as f64 / pieces.len() as f64);
         let bytes = wav::encode(&c[*a..*b]);

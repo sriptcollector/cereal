@@ -1,22 +1,22 @@
 {
   "schema": 1,
   "id": "notes",
-  "name": "Toolbay Notes",
+  "name": "Cereal",
   "tagline": "Free, local AI meeting notes. No bot joins your call.",
   "description": "Records your side and the other side of any call (Zoom, Google Meet, Teams, Slack) without a bot, transcribes it on your computer, tells speakers apart, and turns your rough notes into clean notes with decisions and action items. Search and chat across all your meetings. No account, no limits, no telemetry.",
   "version": "0.1.2",
-  "repo": "sriptcollector/toolbay-notes",
-  "identifier": "ai.toolbay.notes",
+  "repo": "sriptcollector/cereal",
+  "identifier": "ai.toolbay.cereal",
   "license": "MIT",
-  "homepage": "https://github.com/sriptcollector/toolbay-notes",
-  "icon": "https://raw.githubusercontent.com/sriptcollector/toolbay-notes/main/app-icon.png",
+  "homepage": "https://github.com/sriptcollector/cereal",
+  "icon": "https://raw.githubusercontent.com/sriptcollector/cereal/main/app-icon.png",
   "replaces": "Granola",
   "inspiredBy": {
     "name": "Granola",
     "company": "Granola",
     "logoUrl": "src/assets/inspired-by/granola.svg",
     "website": "https://www.granola.ai",
-    "notAffiliated": "Toolbay Notes is an independent open-source project and is not affiliated with or endorsed by Granola."
+    "notAffiliated": "Cereal is an independent open-source project and is not affiliated with or endorsed by Granola."
   },
   "categories": [
     "productivity",
@@ -25,24 +25,24 @@
   ],
   "platforms": {
     "windows-x86_64": {
-      "asset": "Toolbay.Notes_0.1.2_x64-setup.exe",
+      "asset": "Cereal_0.1.2_x64-setup.exe",
       "kind": "nsis",
       "silentArgs": [
         "/S",
         "/NS"
       ],
-      "exe": "toolbay-notes.exe",
+      "exe": "cereal.exe",
       "uninstaller": "uninstall.exe"
     },
     "darwin-aarch64": {
-      "asset": "Toolbay.Notes_0.1.2_aarch64.dmg",
+      "asset": "Cereal_0.1.2_aarch64.dmg",
       "kind": "dmg",
-      "app": "Toolbay Notes.app"
+      "app": "Cereal.app"
     },
     "darwin-x86_64": {
-      "asset": "Toolbay.Notes_0.1.2_x64.dmg",
+      "asset": "Cereal_0.1.2_x64.dmg",
       "kind": "dmg",
-      "app": "Toolbay Notes.app"
+      "app": "Cereal.app"
     }
   },
   "files": [

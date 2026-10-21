@@ -86,7 +86,7 @@ export default function Home({ go, folder }: { go: (r: Route) => void; folder?: 
         <header className="home-head">
           <div>
             <h1>{folder ?? "Your notes"}</h1>
-            <p className="sub">{folder ? "Notes in this folder" : "Toolbay Notes offers to take notes when a call starts in Zoom, Google Meet, Teams or Slack. No bot joins your call."}</p>
+            <p className="sub">{folder ? "Notes in this folder" : "Cereal offers to take notes when a call starts in Zoom, Google Meet, Teams or Slack. No bot joins your call."}</p>
           </div>
           <div className="page-actions">
             <button className="btn ghost" onClick={blank}>
@@ -128,7 +128,7 @@ export default function Home({ go, folder }: { go: (r: Route) => void; folder?: 
           <div className="welcome">
             <div className="welcome-title">Your first meeting notes start here</div>
             <ol>
-              <li>Join a call in Zoom, Google Meet, Teams or Slack. Toolbay Notes offers to take notes, or click <b>New note</b>.</li>
+              <li>Join a call in Zoom, Google Meet, Teams or Slack. Cereal offers to take notes, or click <b>New note</b>.</li>
               <li>Type rough notes as you go. A few words are enough.</li>
               <li>When the call ends, the AI on your computer turns your notes and the transcript into clean notes.</li>
             </ol>

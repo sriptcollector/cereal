@@ -1,11 +1,11 @@
-# Parity checklist: Toolbay Notes vs. Granola
+# Parity checklist: Cereal vs. Granola
 
 Source: `toolbay-research/granola-report.pdf` (public information only; Granola was not installed).
 ✅ done · 🟡 partly · ⬜ not yet · ➖ out of scope for v1. "Better" marks where Notes goes beyond Granola.
 
 ## Capture
 
-| # | Feature | Granola | Toolbay Notes |
+| # | Feature | Granola | Cereal |
 |---|---|---|---|
 | 1 | Bot-free capture, mic + system audio | Mac + Windows | ✅ WASAPI loopback (Windows, tested), ScreenCaptureKit (macOS, CI-built, untested) |
 | 2 | "Me" / "Them" labels from the two tracks | Yes | ✅ (uses your name if set) |
@@ -28,7 +28,7 @@ Source: `toolbay-research/granola-report.pdf` (public information only; Granola 
 
 ## Detection and calendar
 
-| # | Feature | Granola | Toolbay Notes |
+| # | Feature | Granola | Cereal |
 |---|---|---|---|
 | 19–20 | Calendar (Google, Microsoft, ICS) | Google + Microsoft | ⬜ (later, optional) |
 | 21 | Popup 1 minute before calendar meetings | Yes | ⬜ needs calendar |
@@ -42,7 +42,7 @@ Source: `toolbay-research/granola-report.pdf` (public information only; Granola 
 
 ## Notes and AI
 
-| # | Feature | Granola | Toolbay Notes |
+| # | Feature | Granola | Cereal |
 |---|---|---|---|
 | 29 | Notepad during the meeting | Markdown, images, @mentions | 🟡 Plain-text/markdown notepad; images and @mentions ⬜ |
 | 30 | Enhance after the call | Cloud LLM | ✅ Local LLM (Qwen3 4B/1.7B) or your own key; map-reduce for long meetings |
@@ -63,7 +63,7 @@ Source: `toolbay-research/granola-report.pdf` (public information only; Granola 
 
 ## Organise and share
 
-| # | Feature | Granola | Toolbay Notes |
+| # | Feature | Granola | Cereal |
 |---|---|---|---|
 | 46 | Home with notes by day | + Coming up | ✅ (Coming up needs calendar ⬜) |
 | 47 | Folders | Spaces + folders | 🟡 Folders (one level) |
@@ -79,7 +79,7 @@ Source: `toolbay-research/granola-report.pdf` (public information only; Granola 
 
 ## Privacy and consent
 
-| # | Feature | Granola | Toolbay Notes |
+| # | Feature | Granola | Cereal |
 |---|---|---|---|
 | 59 | Where audio goes | Cloud, then deleted | ✅ Never leaves the computer |
 | 60 | Auto-delete | Transcripts | 🟡 Audio retention options; transcript retention ⬜ |
@@ -89,7 +89,7 @@ Source: `toolbay-research/granola-report.pdf` (public information only; Granola 
 
 ## Platform and account
 
-| # | Feature | Granola | Toolbay Notes |
+| # | Feature | Granola | Cereal |
 |---|---|---|---|
 | 65 | Windows + Mac | Yes | ✅ Windows tested; Mac configured and built by CI, not tested on a Mac |
 | 66 | Mobile, web | Yes | ➖ |

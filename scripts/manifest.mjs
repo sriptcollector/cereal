@@ -25,30 +25,30 @@ function entry(asset, extra) {
 
 const manifest = {
   schema: 1,
-  id: "notes",
-  name: "Toolbay Notes",
+  id: "cereal",
+  name: "Cereal",
   tagline: "Free, local AI meeting notes. No bot joins your call.",
   description:
     "Records your side and the other side of any call (Zoom, Google Meet, Teams, Slack) without a bot, transcribes it on your computer, tells speakers apart, and turns your rough notes into clean notes with decisions and action items. Search and chat across all your meetings. No account, no limits, no telemetry.",
   version: v,
-  repo: "sriptcollector/toolbay-notes",
-  identifier: "ai.toolbay.notes",
+  repo: "sriptcollector/cereal",
+  identifier: "ai.toolbay.cereal",
   license: "MIT",
-  homepage: "https://github.com/sriptcollector/toolbay-notes",
-  icon: "https://raw.githubusercontent.com/sriptcollector/toolbay-notes/main/app-icon.png",
+  homepage: "https://github.com/sriptcollector/cereal",
+  icon: "https://raw.githubusercontent.com/sriptcollector/cereal/main/app-icon.png",
   replaces: brand.inspiredBy.name,
   inspiredBy: brand.inspiredBy,
   categories: ["productivity", "meetings", "ai"],
   platforms: {
-    "windows-x86_64": entry(`Toolbay.Notes_${v}_x64-setup.exe`, {
+    "windows-x86_64": entry(`Cereal_${v}_x64-setup.exe`, {
       kind: "nsis",
       // /NS: the hub makes its own desktop shortcut (opens Notes through the hub).
       silentArgs: ["/S", "/NS"],
-      exe: "toolbay-notes.exe",
+      exe: "cereal.exe",
       uninstaller: "uninstall.exe",
     }),
-    "darwin-aarch64": entry(`Toolbay.Notes_${v}_aarch64.dmg`, { kind: "dmg", app: "Toolbay Notes.app" }),
-    "darwin-x86_64": entry(`Toolbay.Notes_${v}_x64.dmg`, { kind: "dmg", app: "Toolbay Notes.app" }),
+    "darwin-aarch64": entry(`Cereal_${v}_aarch64.dmg`, { kind: "dmg", app: "Cereal.app" }),
+    "darwin-x86_64": entry(`Cereal_${v}_x64.dmg`, { kind: "dmg", app: "Cereal.app" }),
   },
   files: [
     {

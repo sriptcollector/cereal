@@ -49,7 +49,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
           <>
             <Logo size={56} />
             <h1>Meeting notes that write themselves</h1>
-            <p className="lead">Toolbay Notes listens to your calls on Zoom, Google Meet, Teams, Slack or anything else, with no bot joining. You jot a few words; when the call ends, the AI on your computer writes clean notes with decisions and action items.</p>
+            <p className="lead">Cereal listens to your calls on Zoom, Google Meet, Teams, Slack or anything else, with no bot joining. You jot a few words; when the call ends, the AI on your computer writes clean notes with decisions and action items.</p>
             <ul className="ob-points">
               <li>{Icon.shield} Everything stays on this computer. No account, no cloud, no tracking.</li>
               <li>{Icon.people} Knows who said what: you, and each of the other people.</li>
@@ -73,7 +73,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             <div className="ob-icon">{Icon.shield}</div>
             <h1>Recording is your responsibility</h1>
             <p className="lead">Laws about recording calls differ by place. In many US states, in Canada, in the EU and elsewhere, <b>everyone on the call must agree</b> before it's recorded or transcribed.</p>
-            <p className="lead">Toolbay Notes helps: each time it starts, it reminds you and gives you a short message to paste into the meeting chat.</p>
+            <p className="lead">Cereal helps: each time it starts, it reminds you and gives you a short message to paste into the meeting chat.</p>
             <label className="field">
               <span>Your “let others know” message</span>
               <textarea rows={3} value={s.consent_message} onChange={(e) => save({ consent_message: e.target.value })} />
@@ -139,7 +139,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             )}
             <div className="ob-actions">
               <button className="btn primary big" onClick={finish}>
-                Open Toolbay Notes
+                Open Cereal
               </button>
             </div>
           </>

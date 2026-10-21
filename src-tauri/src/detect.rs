@@ -30,7 +30,13 @@ fn friendly(exe: &str, titles: &[String]) -> Option<String> {
     if e.starts_with("toolbay") || e.contains("wispr") || e.contains("superwhisper") {
         return None;
     }
-    let browsers = ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "vivaldi.exe", "arc.exe", "chromium.exe"];
+    if e.starts_with("ai.toolbay.") {
+        return None;
+    }
+    let browsers = [
+        "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "vivaldi.exe", "arc.exe", "chromium.exe",
+        "com.google.chrome", "com.apple.safari", "company.thebrowser.browser", "com.microsoft.edgemac", "org.mozilla.firefox", "com.brave.browser", "com.operasoftware.opera", "com.vivaldi.vivaldi",
+    ];
     if browsers.contains(&e.as_str()) {
         let t = titles.iter().map(|t| t.to_lowercase()).collect::<Vec<_>>();
         let has = |p: &str| t.iter().any(|x| x.contains(p));
@@ -56,7 +62,12 @@ fn friendly(exe: &str, titles: &[String]) -> Option<String> {
         );
     }
     let name = match e.as_str() {
-        "zoom.exe" | "zoom" | "cpthost.exe" => "Zoom",
+        "zoom.exe" | "zoom" | "cpthost.exe" | "cpthost" | "us.zoom.xos" => "Zoom",
+        "com.microsoft.teams2" | "com.microsoft.teams" => "Microsoft Teams",
+        "com.tinyspeck.slackmacgap" => "Slack huddle",
+        "com.hnc.discord" => "Discord",
+        "com.cisco.webexmeetingsapp" | "com.webex.meetingmanager" | "com.cisco.webex.meetings" => "Webex",
+        "net.whatsapp.whatsapp" => "WhatsApp call",
         "ms-teams.exe" | "teams.exe" | "msteams.exe" => "Microsoft Teams",
         "slack.exe" => "Slack huddle",
         "discord.exe" => "Discord",
@@ -65,7 +76,7 @@ fn friendly(exe: &str, titles: &[String]) -> Option<String> {
         "whatsapp.exe" => "WhatsApp call",
         "signal.exe" => "Signal call",
         "telegram.exe" => "Telegram call",
-        "facetime" => "FaceTime",
+        "facetime" | "com.apple.facetime" => "FaceTime",
         "gotomeeting.exe" | "g2mcomm.exe" => "GoTo Meeting",
         "ringcentral.exe" => "RingCentral",
         "dialpad.exe" => "Dialpad",
@@ -143,7 +154,80 @@ pub fn mic_users() -> Vec<String> {
 }
 
 #[cfg(target_os = "macos")]
+mod mac_audio {
+    //! macOS 14.2+: CoreAudio says which apps are capturing audio input right now.
+    use std::ffi::c_void;
+    use std::ptr::null;
+
+    #[repr(C)]
+    struct Addr {
+        selector: u32,
+        scope: u32,
+        element: u32,
+    }
+    #[link(name = "CoreAudio", kind = "framework")]
+    extern "C" {
+        fn AudioObjectGetPropertyDataSize(obj: u32, addr: *const Addr, qsize: u32, qdata: *const c_void, size: *mut u32) -> i32;
+        fn AudioObjectGetPropertyData(obj: u32, addr: *const Addr, qsize: u32, qdata: *const c_void, size: *mut u32, data: *mut c_void) -> i32;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        fn CFStringGetCString(s: *const c_void, buf: *mut i8, size: isize, encoding: u32) -> u8;
+        fn CFRelease(p: *const c_void);
+    }
+    const fn cc(s: &[u8; 4]) -> u32 {
+        ((s[0] as u32) << 24) | ((s[1] as u32) << 16) | ((s[2] as u32) << 8) | (s[3] as u32)
+    }
+    const SYSTEM: u32 = 1;
+    const GLOBAL: u32 = cc(b"glob");
+
+    unsafe fn get<T: Default + Copy>(obj: u32, sel: u32) -> Option<T> {
+        let a = Addr { selector: sel, scope: GLOBAL, element: 0 };
+        let mut v = T::default();
+        let mut size = std::mem::size_of::<T>() as u32;
+        (AudioObjectGetPropertyData(obj, &a, 0, null(), &mut size, &mut v as *mut T as *mut c_void) == 0).then_some(v)
+    }
+
+    /// Bundle ids of apps whose audio input is running; None if this macOS can't tell.
+    pub fn input_bundles() -> Option<Vec<String>> {
+        unsafe {
+            let a = Addr { selector: cc(b"prs#"), scope: GLOBAL, element: 0 };
+            let mut size = 0u32;
+            if AudioObjectGetPropertyDataSize(SYSTEM, &a, 0, null(), &mut size) != 0 || size == 0 {
+                return None;
+            }
+            let mut ids = vec![0u32; size as usize / 4];
+            if AudioObjectGetPropertyData(SYSTEM, &a, 0, null(), &mut size, ids.as_mut_ptr() as *mut c_void) != 0 {
+                return None;
+            }
+            let mut out = vec![];
+            for id in ids {
+                let running: u32 = get(id, cc(b"piri")).unwrap_or(0);
+                if running == 0 {
+                    continue;
+                }
+                let cf: usize = get(id, cc(b"pbid")).unwrap_or(0);
+                if cf == 0 {
+                    continue;
+                }
+                let mut buf = [0i8; 256];
+                if CFStringGetCString(cf as *const c_void, buf.as_mut_ptr(), 256, 0x0800_0100) != 0 {
+                    let s = std::ffi::CStr::from_ptr(buf.as_ptr()).to_string_lossy().to_string();
+                    out.push(s);
+                }
+                CFRelease(cf as *const c_void);
+            }
+            Some(out)
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
 pub fn mic_users() -> Vec<String> {
+    if let Some(v) = mac_audio::input_bundles() {
+        return v;
+    }
+    // Older macOS: Zoom's in-meeting helper process.
     let out = std::process::Command::new("ps").args(["-axco", "comm"]).output().map(|o| String::from_utf8_lossy(&o.stdout).to_string()).unwrap_or_default();
     out.lines().map(|l| l.trim()).filter(|l| *l == "CptHost").map(|l| l.to_string()).collect()
 }
@@ -185,9 +269,9 @@ pub fn start(st: St) {
         loop {
             std::thread::sleep(Duration::from_secs(2));
             let calls = active_calls();
-            let (detect, auto_stop) = {
+            let (onboarded, auto_stop, s) = {
                 let s = st.settings.read();
-                (s.detect_meetings && s.onboarded, s.auto_stop)
+                (s.onboarded, s.auto_stop, s.clone())
             };
             let recording_app = st.session.lock().as_ref().map(|s| s.app.clone());
             // New call?
@@ -195,11 +279,30 @@ pub fn start(st: St) {
                 if prev.iter().any(|p| p.app == c.app) {
                     continue;
                 }
-                log::info!("call detected: {} ({})", c.app, c.key);
+                let rule = s.rule_for(&c.app);
+                log::info!("call detected: {} ({}) -> {rule}", c.app, c.key);
                 let snoozed = SNOOZED.lock().get(&c.app).map(|t| t.elapsed() < Duration::from_secs(600)).unwrap_or(false);
-                if detect && recording_app.is_none() && !snoozed {
-                    *DETECTED.lock() = Some(c.clone());
-                    crate::show_popup(&st, c);
+                if !onboarded || recording_app.is_some() || snoozed {
+                    continue;
+                }
+                match rule.as_str() {
+                    "record" => match crate::recorder::start_with(&st, None, &c.app, "", true) {
+                        Ok(m) => {
+                            *DETECTED.lock() = Some(c.clone());
+                            crate::show_auto_started(&st, c, &m.id, !s.auto_consent_shown);
+                            if !s.auto_consent_shown {
+                                let mut s2 = st.settings.read().clone();
+                                s2.auto_consent_shown = true;
+                                let _ = st.save_settings(s2);
+                            }
+                        }
+                        Err(e) => log::warn!("auto-record {}: {e:#}", c.app),
+                    },
+                    "ask" => {
+                        *DETECTED.lock() = Some(c.clone());
+                        crate::show_popup(&st, c);
+                    }
+                    _ => {}
                 }
             }
             if calls.is_empty() {

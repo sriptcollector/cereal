@@ -12,7 +12,7 @@ export default function Pill() {
   const l = rec?.levels;
   const v = Math.max(l?.mic ?? 0, l?.system ?? 0);
   return (
-    <button className="pill" onClick={() => api.pillClick()} title="Toolbay Notes is taking notes. Click to open.">
+    <button className="pill" onClick={() => api.pillClick()} title="Cereal is taking notes. Click to open.">
       <span className={`rec-dot ${l?.paused ? "paused" : ""}`} />
       <span className="pill-bars">
         {[0.3, 0.7, 1, 0.6, 0.35].map((k, i) => (

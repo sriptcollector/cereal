@@ -56,7 +56,7 @@ pub struct SystemAudio {
 
 impl SystemAudio {
     pub fn start(track: Arc<Mutex<Track>>, clock: ClockFn) -> Result<SystemAudio> {
-        let perm = || anyhow!("macOS hasn't allowed Toolbay Notes to hear your computer's sound yet. Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on Toolbay Notes, then start again.");
+        let perm = || anyhow!("macOS hasn't allowed Cereal to hear your computer's sound yet. Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on Cereal, then start again.");
         let content = SCShareableContent::get().map_err(|_| perm())?;
         let display = content.displays().into_iter().next().ok_or_else(perm)?;
         let filter = SCContentFilter::create().with_display(&display).with_excluding_windows(&[]).build().map_err(|e| anyhow!("{e:?}"))?;

@@ -71,7 +71,7 @@ export default function App() {
         <div className="brand">
           <Logo />
           <div>
-            <div className="brand-name">Notes</div>
+            <div className="brand-name">Cereal</div>
             <div className="brand-by">by Toolbay</div>
           </div>
         </div>

@@ -1,6 +1,6 @@
-# Toolbay Notes: rules for contributors and coding agents
+# Cereal: rules for contributors and coding agents
 
-Toolbay Notes is a free, open-source, local-first AI meeting recorder inspired by Granola.
+Cereal is a free, open-source, local-first AI meeting recorder inspired by Granola.
 It's part of Toolbay, where every tool is a free version of a paid app and opens from the
 Toolbay hub. These rules apply to every change; the "Toolbay tool rules" apply to every
 Toolbay app (the same list lives in toolbay-flow/AGENTS.md).
@@ -67,10 +67,10 @@ Toolbay app (the same list lives in toolbay-flow/AGENTS.md).
 - `npm install`, then `npm run tauri dev` to run; `npm run tauri build` for the installer (fetches the
   bundled engines and models via `scripts/fetch-bundled.mjs`).
 - `cargo test --workspace` must pass.
-- Headless (debug build, it has a console): `toolbay-notes --record <secs> <dir>` (capture test),
+- Headless (debug build, it has a console): `cereal --record <secs> <dir>` (capture test),
   `--detect` (who's using the mic), `--diarize <wav> <threshold>`, and
   `--process <mic.wav> <system.wav> [template] [--notes "..."]` (full pipeline with timings).
-  `TOOLBAY_NOTES_DATA=<dir>` uses another data folder; `KEEP=1` keeps the meeting in the app.
+  `CEREAL_DATA=<dir>` uses another data folder; `KEEP=1` keeps the meeting in the app.
 - Claude desktop is MSIX: its shells virtualize %APPDATA% writes. Launch real installs via
   `explorer.exe some.bat` when testing the installed app.
 - Release: bump `version` in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`,

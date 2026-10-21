@@ -1,5 +1,7 @@
-//! Toolbay Notes: free, local, open-source AI meeting notes. No bot joins your call.
+//! Cereal: free, local, open-source AI meeting notes. No bot joins your call.
 
+mod account;
+mod calendar;
 mod capture;
 #[cfg(target_os = "macos")]
 mod capture_mac;
@@ -9,6 +11,8 @@ mod db;
 mod detect;
 mod engine;
 mod hub;
+mod library;
+mod library_cmds;
 mod logging;
 mod notes;
 mod process;
@@ -58,7 +62,7 @@ pub fn ui_ready(app: &AppHandle) {
 
 fn create_main(app: &AppHandle, visible: bool) -> tauri::Result<()> {
     let w = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-        .title("Toolbay Notes")
+        .title("Cereal")
         .inner_size(1180.0, 800.0)
         .min_inner_size(860.0, 600.0)
         .center()
@@ -99,7 +103,7 @@ pub fn show_popup(st: &St, call: &detect::Call) {
         let w = match app2.get_webview_window("popup") {
             Some(w) => w,
             None => match WebviewWindowBuilder::new(&app2, "popup", WebviewUrl::App("index.html#popup".into()))
-                .title("Toolbay Notes")
+                .title("Cereal")
                 .inner_size(POPUP_W, POPUP_H)
                 .decorations(false)
                 .transparent(true)
@@ -130,6 +134,49 @@ pub fn show_popup(st: &St, call: &detect::Call) {
     });
 }
 
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AutoStarted {
+    app: String,
+    meeting_id: String,
+    consent: bool,
+}
+
+/// Recording started by itself: say so right away (never record silently). The first
+/// time, the card also carries the consent note.
+pub fn show_auto_started(st: &St, call: &detect::Call, meeting_id: &str, consent: bool) {
+    show_popup(st, call);
+    if let Some(app) = &st.app {
+        let _ = app.emit_to("popup", "auto-started", AutoStarted { app: call.app.clone(), meeting_id: meeting_id.to_string(), consent });
+    }
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EventPopup {
+    event: calendar::Event,
+}
+
+/// "Meeting starting" card for a calendar event (a minute before it starts).
+pub fn show_event_popup(st: &St, e: &calendar::Event) {
+    let call = detect::Call { key: format!("event:{}", e.id), app: e.title.clone() };
+    show_popup(st, &call);
+    if let Some(app) = &st.app {
+        let _ = app.emit_to("popup", "event-starting", EventPopup { event: e.clone() });
+    }
+}
+
+/// Granola-style: put the note beside the call (right third of the screen).
+pub fn dock_beside_call(app: &AppHandle) {
+    let Some(w) = app.get_webview_window("main") else { return };
+    let Ok(Some(mon)) = w.current_monitor().or_else(|_| app.primary_monitor()) else { return };
+    let wa = mon.work_area();
+    let width = (wa.size.width as f64 * 0.34).max(520.0 * mon.scale_factor()) as u32;
+    let _ = w.unmaximize();
+    let _ = w.set_size(PhysicalSize::new(width, wa.size.height));
+    let _ = w.set_position(PhysicalPosition::new(wa.position.x + wa.size.width as i32 - width as i32, wa.position.y));
+}
+
 pub fn hide_popup(st: &St) {
     if let Some(app) = &st.app {
         if let Some(w) = app.get_webview_window("popup") {
@@ -141,14 +188,15 @@ pub fn hide_popup(st: &St) {
 // ---------------- floating recording pill ----------------
 
 const PILL_W: f64 = 64.0;
-const PILL_H: f64 = 132.0;
+const PILL_H: f64 = 188.0;
 
 /// While recording and the main window isn't in front, a small pill on the right edge
 /// shows that notes are being taken; click it to come back.
 pub fn update_pill(app: &AppHandle) {
-    let recording = app.try_state::<St>().map(|s| s.session.lock().is_some()).unwrap_or(false);
+    let (recording, auto) = app.try_state::<St>().map(|s| s.session.lock().as_ref().map(|x| (true, x.auto)).unwrap_or((false, false))).unwrap_or((false, false));
     let main_front = app.get_webview_window("main").map(|w| w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false) && !w.is_minimized().unwrap_or(false)).unwrap_or(false);
-    let want = recording && !main_front;
+    // Always visible for automatic recordings; otherwise when the main window isn't in front.
+    let want = recording && (auto || !main_front);
     let pill = app.get_webview_window("pill");
     if !want {
         if let Some(p) = pill {
@@ -159,7 +207,7 @@ pub fn update_pill(app: &AppHandle) {
     let p = match pill {
         Some(p) => p,
         None => match WebviewWindowBuilder::new(app, "pill", WebviewUrl::App("index.html#pill".into()))
-            .title("Toolbay Notes recording")
+            .title("Cereal recording")
             .inner_size(PILL_W, PILL_H)
             .decorations(false)
             .transparent(true)
@@ -197,11 +245,20 @@ pub fn update_pill(app: &AppHandle) {
 fn tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let st = app.state::<St>();
     let rec = st.session.lock().is_some();
-    let open = MenuItem::with_id(app, "open", "Open Toolbay Notes", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open Cereal", true, None::<&str>)?;
+    let next = calendar::next_event().map(|e| {
+        let t = chrono::DateTime::parse_from_rfc3339(&e.start).map(|d| d.with_timezone(&chrono::Local).format("%-I:%M %p").to_string()).unwrap_or_default();
+        format!("Next: {} at {}", e.title.chars().take(40).collect::<String>(), t)
+    });
     let toggle = MenuItem::with_id(app, "toggle", if rec { "Stop taking notes" } else { "Start taking notes" }, true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit Toolbay Notes", true, None::<&str>)?;
-    Menu::with_items(app, &[&open, &toggle, &PredefinedMenuItem::separator(app)?, &settings, &PredefinedMenuItem::separator(app)?, &quit])
+    let quit = MenuItem::with_id(app, "quit", "Quit Cereal", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &toggle, &PredefinedMenuItem::separator(app)?, &settings, &PredefinedMenuItem::separator(app)?, &quit])?;
+    if let Some(n) = next {
+        menu.insert(&MenuItem::with_id(app, "next", n, false, None::<&str>)?, 0)?;
+        menu.insert(&PredefinedMenuItem::separator(app)?, 1)?;
+    }
+    Ok(menu)
 }
 
 pub fn refresh_tray(st: &St) {
@@ -211,7 +268,7 @@ pub fn refresh_tray(st: &St) {
         if let (Some(tray), Ok(menu)) = (app2.tray_by_id("notes"), tray_menu(&app2)) {
             let rec = app2.state::<St>().session.lock().is_some();
             let _ = tray.set_menu(Some(menu));
-            let _ = tray.set_tooltip(Some(if rec { "Toolbay Notes: taking notes" } else { "Toolbay Notes" }));
+            let _ = tray.set_tooltip(Some(if rec { "Cereal: taking notes" } else { "Cereal" }));
         }
         update_pill(&app2);
         hub::write_state(&app2);
@@ -260,6 +317,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| hub::handle_args(app, &args)))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .setup(|app| {
@@ -276,7 +334,7 @@ pub fn run() {
 
             TrayIconBuilder::with_id("notes")
                 .icon(app.default_window_icon().cloned().unwrap())
-                .tooltip("Toolbay Notes")
+                .tooltip("Cereal")
                 .menu(&tray_menu(&handle)?)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, ev| on_menu(app, ev.id().as_ref()))
@@ -294,6 +352,7 @@ pub fn run() {
             }
             engine::auto_setup(&st);
             detect::start(st.clone());
+            calendar::start(st.clone());
             sync::start(st.clone());
             recover(&st);
             // `--start` / `--open <page>` on first launch too (not only when forwarded).
@@ -313,6 +372,7 @@ pub fn run() {
             let st2 = st.clone();
             std::thread::spawn(move || loop {
                 process::retention_pass(&st2);
+                process::trash_pass(&st2);
                 std::thread::sleep(Duration::from_secs(6 * 3600));
             });
             Ok(())
@@ -326,8 +386,6 @@ pub fn run() {
             commands::meeting_get,
             commands::meeting_create,
             commands::meeting_update,
-            commands::meeting_delete,
-            commands::folders,
             commands::rename_speaker,
             commands::segment_update,
             commands::segment_delete,
@@ -341,9 +399,6 @@ pub fn run() {
             commands::template_save,
             commands::template_delete,
             commands::search,
-            commands::chat_list,
-            commands::chat_ask,
-            commands::chat_clear,
             commands::list_mics,
             commands::audio_check,
             commands::models_info,
@@ -359,9 +414,43 @@ pub fn run() {
             commands::toolbay_account,
             commands::sync_status,
             commands::pill_click,
+            commands::set_app_rule,
+            library_cmds::folders_list,
+            library_cmds::folder_save,
+            library_cmds::folder_delete,
+            library_cmds::files_list,
+            library_cmds::file_add,
+            library_cmds::file_delete,
+            library_cmds::meeting_trash,
+            library_cmds::meeting_restore,
+            library_cmds::meeting_purge,
+            library_cmds::trash_list,
+            library_cmds::people_list,
+            library_cmds::companies_list,
+            library_cmds::meetings_with,
+            library_cmds::recipes_list,
+            library_cmds::recipe_save,
+            library_cmds::recipe_delete,
+            library_cmds::threads_list,
+            library_cmds::thread_get,
+            library_cmds::thread_delete,
+            library_cmds::chat_send,
+            library_cmds::calendar_events,
+            library_cmds::calendar_refresh,
+            library_cmds::note_for_event,
+            library_cmds::brief_for_event,
+            library_cmds::join_event,
+            library_cmds::dock_window,
+            library_cmds::dictate_start,
+            library_cmds::dictate_stop,
+            library_cmds::import_audio,
+            library_cmds::export_docx,
+            library_cmds::export_all,
+            commands::feedback_send,
+            commands::feedback_info,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Toolbay Notes")
+        .expect("error while building Cereal")
         .run(|_app, ev| {
             if let tauri::RunEvent::ExitRequested { code, api, .. } = ev {
                 // Keep running in the tray when windows close; real quits pass a code.

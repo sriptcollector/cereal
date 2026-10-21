@@ -218,7 +218,7 @@ export default function SettingsPage() {
             </Row>
           </>
         ) : (
-          <Row title="Not signed in" desc="Open Toolbay Notes from the Toolbay app while signed in to sync settings and templates between computers. Everything works without an account." />
+          <Row title="Not signed in" desc="Open Cereal from the Toolbay app while signed in to sync settings and templates between computers. Everything works without an account." />
         )}
       </Section>
 
@@ -232,8 +232,8 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="About">
-        <Row title={`Toolbay Notes ${app?.version ?? ""}`} desc="Free and open source (MIT).">
-          <button className="btn ghost" onClick={() => openUrl("https://github.com/sriptcollector/toolbay-notes")}>
+        <Row title={`Cereal ${app?.version ?? ""}`} desc="Free and open source (MIT).">
+          <button className="btn ghost" onClick={() => openUrl("https://github.com/sriptcollector/cereal")}>
             Source code
           </button>
         </Row>
@@ -241,7 +241,7 @@ export default function SettingsPage() {
           <Credit />
         </div>
         {!app?.fromHub && (
-          <Row title="Quit Toolbay Notes" desc="Stops meeting detection until you open it again.">
+          <Row title="Quit Cereal" desc="Stops meeting detection until you open it again.">
             <button className="btn ghost danger" onClick={() => api.quit()}>
               Quit
             </button>

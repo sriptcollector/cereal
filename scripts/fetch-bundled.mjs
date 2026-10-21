@@ -1,4 +1,4 @@
-// Downloads what ships inside the installer, so Toolbay Notes works the moment it's
+// Downloads what ships inside the installer, so Cereal works the moment it's
 // installed: the speech engine (whisper.cpp, CPU) with a starter model, the notes
 // engine (llama.cpp, CPU), and the speaker engine (sherpa-onnx) with its two small
 // models. The notes AI model itself (1-2.5 GB, picked for the computer) comes through

@@ -1,4 +1,4 @@
-//! toolbay-engine: the local AI engine shared by Toolbay tools (Toolbay Notes, and
+//! toolbay-engine: the local AI engine shared by Toolbay tools (Cereal, and
 //! Toolbay Flow can use it too). Started from Toolbay Flow's engines.rs / models.rs /
 //! llm.rs and made app-independent: no Tauri types, progress goes through a callback.
 //!

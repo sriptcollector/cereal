@@ -1,6 +1,6 @@
 //! Settings and custom templates follow the user to their other computers through
-//! the Toolbay account (toolbay.ai /api/v1/me/tools/toolbay-notes/sync). Only when
-//! the Toolbay hub started us with a signed-in token, and only these small items:
+//! the Toolbay account (toolbay.ai /api/v1/me/tools/cereal/sync). Only when
+//! the person is signed in to the Toolbay app, and only these small items:
 //! recordings, transcripts and notes never leave this computer.
 //!
 //! Keys: "settings" (the Synced subset), "templates/<id>" (one per custom template).
@@ -12,10 +12,10 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::Duration;
 
-const API: &str = "https://toolbay.ai/api/v1/me/tools/toolbay-notes/sync";
+const API: &str = "https://toolbay.ai/api/v1/me/tools/cereal/sync";
 
 fn token() -> Option<String> {
-    std::env::var("TOOLBAY_TOKEN").ok().filter(|t| !t.is_empty())
+    crate::account::token()
 }
 
 pub fn available(st: &St) -> bool {

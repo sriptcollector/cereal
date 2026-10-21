@@ -32,6 +32,7 @@ impl St {
     pub fn new(app: Option<AppHandle>, config_dir: PathBuf, data_dir: PathBuf, bundled: Option<PathBuf>) -> anyhow::Result<St> {
         std::fs::create_dir_all(&config_dir)?;
         std::fs::create_dir_all(&data_dir)?;
+        migrate_from_toolbay_notes(&data_dir);
         let db = Db::open(&data_dir.join("notes.sqlite"))?;
         Ok(St {
             app,
@@ -75,4 +76,23 @@ impl St {
     pub fn bundled_dir(app: &AppHandle) -> Option<PathBuf> {
         app.path().resource_dir().ok().map(|d| d.join("bundled")).filter(|d| d.exists())
     }
+}
+
+/// Cereal was called "Toolbay Notes" (app id ai.toolbay.notes) before 0.2. Move its
+/// notes, recordings, settings and models over once, the first time Cereal starts.
+fn migrate_from_toolbay_notes(data_dir: &std::path::Path) {
+    if data_dir.join("notes.sqlite").exists() {
+        return;
+    }
+    let Some(old) = data_dir.parent().map(|p| p.join("ai.toolbay.notes")) else { return };
+    if !old.join("notes.sqlite").exists() {
+        return;
+    }
+    for name in ["notes.sqlite", "notes.sqlite-wal", "notes.sqlite-shm", "settings.json", "meetings", "models", "engines"] {
+        let (a, b) = (old.join(name), data_dir.join(name));
+        if a.exists() && !b.exists() && std::fs::rename(&a, &b).is_err() && a.is_file() {
+            let _ = std::fs::copy(&a, &b);
+        }
+    }
+    log::info!("moved data from Toolbay Notes ({})", old.display());
 }

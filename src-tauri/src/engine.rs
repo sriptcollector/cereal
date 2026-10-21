@@ -68,7 +68,7 @@ pub fn speech_model(st: &St) -> Option<(String, PathBuf)> {
 pub async fn ensure_whisper(st: &St) -> Result<String> {
     let _g = st.engine_lock.lock().await;
     let use_gpu = st.settings.read().use_gpu;
-    let (model_id, model) = speech_model(st).ok_or_else(|| anyhow!("Toolbay Notes is still getting its speech model. Try again in a moment."))?;
+    let (model_id, model) = speech_model(st).ok_or_else(|| anyhow!("Cereal is still getting its speech model. Try again in a moment."))?;
     // Prefer the GPU engine once it's on disk; until then use the bundled CPU one.
     let mut eng = toolbay_engine::pick_engine("whisper", use_gpu).ok_or_else(|| anyhow!("No speech engine for this computer"))?;
     let mut exe = st.store.find_engine(eng);
@@ -280,7 +280,7 @@ pub fn auto_setup(st: &St) {
             Ok(()) => emit(false, ""),
             Err(e) => {
                 log::warn!("model setup: {e:#}");
-                emit(false, "Couldn't download the AI models yet. Recording still works; Toolbay Notes will retry when you're online.");
+                emit(false, "Couldn't download the AI models yet. Recording still works; Cereal will retry when you're online.");
             }
         }
     });

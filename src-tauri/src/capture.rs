@@ -578,7 +578,7 @@ pub fn list_mics() -> Vec<String> {
 
 /// A few seconds of each source's level, for the onboarding / settings check.
 pub fn quick_check(secs: f64, microphone: Option<String>) -> Result<(f32, f32)> {
-    let dir = std::env::temp_dir().join(format!("toolbay-notes-check-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("cereal-check-{}", std::process::id()));
     let cap = Capture::start(&dir, microphone, true)?;
     let mut peak = (0f32, 0f32);
     let t0 = Instant::now();

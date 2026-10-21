@@ -17,6 +17,8 @@ pub struct Session {
     pub cap: Option<Capture>,
     stop: Arc<AtomicBool>,
     pub started: Instant,
+    /// Started by meeting detection (not by the user): short or silent ones are discarded.
+    pub auto: bool,
     /// Last time either side was clearly talking (for the 15-minute silence stop).
     pub last_voice: Instant,
 }
@@ -51,6 +53,11 @@ pub fn recording_id(st: &St) -> Option<String> {
 /// Starts recording. `meeting_id` = an existing note to record into (resume), or None
 /// for a new note. Returns the meeting.
 pub fn start(st: &St, meeting_id: Option<String>, app: &str, title: &str) -> Result<Meeting> {
+    start_with(st, meeting_id, app, title, false)
+}
+
+/// `auto` = started by meeting detection.
+pub fn start_with(st: &St, meeting_id: Option<String>, app: &str, title: &str, auto: bool) -> Result<Meeting> {
     if let Some(id) = recording_id(st) {
         if Some(&id) == meeting_id.as_ref() {
             return st.db.meeting(&id)?.ok_or_else(|| anyhow!("missing meeting"));
@@ -72,7 +79,19 @@ pub fn start(st: &St, meeting_id: Option<String>, app: &str, title: &str) -> Res
                 ..Default::default()
             };
             st.db.create_meeting(&m)?;
-            m
+            // In a calendar meeting? Take its title and attendees (Granola links calls that
+            // start within 15 minutes of an event).
+            if title.is_empty() {
+                if let Some(e) = crate::calendar::current_event() {
+                    let _ = st.db.set(&m.id, "title", &e.title);
+                    let _ = st.db.set(&m.id, "attendees", &e.attendees.join(", "));
+                    let _ = st.db.set(&m.id, "event_id", &e.id);
+                }
+            }
+            if let Some(f) = st.db.meeting(&m.id)?.and_then(|x| st.db.auto_folder_for(&x.title)) {
+                let _ = st.db.set(&m.id, "folder", &f);
+            }
+            st.db.meeting(&m.id)?.unwrap_or(m)
         }
     };
     // Each recording run gets its own folder; a resumed note has several "parts".
@@ -88,7 +107,7 @@ pub fn start(st: &St, meeting_id: Option<String>, app: &str, title: &str) -> Res
         st.db.set(&m.id, "app", app)?;
     }
     let stop = Arc::new(AtomicBool::new(false));
-    *st.session.lock() = Some(Session { meeting_id: m.id.clone(), app: app.to_string(), cap: Some(cap), stop: stop.clone(), started: Instant::now(), last_voice: Instant::now() });
+    *st.session.lock() = Some(Session { meeting_id: m.id.clone(), app: app.to_string(), cap: Some(cap), stop: stop.clone(), started: Instant::now(), auto, last_voice: Instant::now() });
     log::info!("recording started: {} ({})", m.id, if app.is_empty() { "manual" } else { app });
     live_loop(st.clone(), m.id.clone(), offset, stop);
     crate::refresh_tray(st);
@@ -113,6 +132,7 @@ pub fn stop(st: &St) -> Option<String> {
     let sess = st.session.lock().take()?;
     sess.stop.store(true, Ordering::SeqCst);
     let id = sess.meeting_id.clone();
+    let auto = sess.auto;
     let cap = sess.cap;
     let st2 = st.clone();
     std::thread::spawn(move || {
@@ -122,6 +142,18 @@ pub fn stop(st: &St) -> Option<String> {
             let prev = st2.db.meeting(&id).ok().flatten().map(|m| m.duration_s).unwrap_or(0.0);
             let _ = st2.db.set_duration(&id, prev + secs);
             log::info!("recording stopped: {id} ({secs:.0} s) in {}", dir.display());
+            // A false alarm from detection (under a minute, or nobody spoke): drop it quietly.
+            if auto && prev == 0.0 {
+                let spoke = st2.db.segments(&id).map(|v| v.iter().any(|s| s.text.split_whitespace().count() >= 3)).unwrap_or(false);
+                let typed = st2.db.meeting(&id).ok().flatten().map(|m| !m.my_notes.trim().is_empty()).unwrap_or(false);
+                if !typed && (secs < 60.0 || !spoke) {
+                    log::info!("discarded auto recording {id}: {secs:.0} s, speech: {spoke}");
+                    let _ = st2.db.delete_meeting(&id);
+                    let _ = std::fs::remove_dir_all(st2.meetings_dir().join(&id));
+                    st2.emit("meeting-deleted", id.clone());
+                    return;
+                }
+            }
         }
         let _ = st2.db.set(&id, "ended_at", &now());
         let _ = st2.db.set(&id, "status", "processing");
@@ -147,7 +179,8 @@ fn live_loop(st: St, id: String, offset: f64, stop: Arc<AtomicBool>) {
     tauri::async_runtime::spawn(async move {
         let mut last_levels = Instant::now();
         let mut flushed = false;
-        let mut prompt: [String; 2] = [String::new(), String::new()];
+        let vocab = st.settings.read().vocabulary.join(", ");
+        let mut prompt: [String; 2] = [vocab.clone(), vocab];
         loop {
             let stopping = stop.load(Ordering::SeqCst);
             if stopping && flushed {

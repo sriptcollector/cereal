@@ -34,6 +34,10 @@ pub struct Meeting {
     pub error: String,
     pub has_audio: bool,
     pub updated_at: String,
+    /// Set when moved to the trash (kept 30 days).
+    pub deleted_at: Option<String>,
+    /// Calendar event this note belongs to (ICS UID), if any.
+    pub event_id: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -84,14 +88,14 @@ pub struct Hit {
 }
 
 pub struct Db {
-    c: Mutex<Connection>,
+    pub(crate) c: Mutex<Connection>,
 }
 
 pub fn now() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
-const MEETING_COLS: &str = "id,title,created_at,started_at,ended_at,duration_s,app,status,step,template_id,my_notes,enhanced,folder,attendees,speaker_names,error,has_audio,updated_at";
+const MEETING_COLS: &str = "id,title,created_at,started_at,ended_at,duration_s,app,status,step,template_id,my_notes,enhanced,folder,attendees,speaker_names,error,has_audio,updated_at,deleted_at,event_id";
 
 fn meeting_row(r: &rusqlite::Row) -> rusqlite::Result<Meeting> {
     Ok(Meeting {
@@ -113,6 +117,8 @@ fn meeting_row(r: &rusqlite::Row) -> rusqlite::Result<Meeting> {
         error: r.get(15)?,
         has_audio: r.get::<_, i64>(16)? != 0,
         updated_at: r.get(17)?,
+        deleted_at: r.get(18)?,
+        event_id: r.get(19)?,
     })
 }
 
@@ -141,7 +147,18 @@ impl Db {
             CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT NOT NULL);
             CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(meeting_id UNINDEXED, title, notes, transcript, tokenize='porter unicode61');",
         )?;
-        Ok(Db { c: Mutex::new(c) })
+        // Columns added after 0.1 (errors mean they already exist).
+        for sql in [
+            "ALTER TABLE meetings ADD COLUMN deleted_at TEXT",
+            "ALTER TABLE meetings ADD COLUMN event_id TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE chats ADD COLUMN thread_id TEXT",
+        ] {
+            let _ = c.execute(sql, []);
+        }
+        c.execute_batch(crate::library::SCHEMA)?;
+        let db = Db { c: Mutex::new(c) };
+        db.migrate_folder_names()?;
+        Ok(db)
     }
 
     // ---------------- meetings ----------------
@@ -162,14 +179,14 @@ impl Db {
 
     pub fn meetings(&self, folder: Option<&str>) -> Result<Vec<Meeting>> {
         let c = self.c.lock();
-        let mut st = c.prepare(&format!("SELECT {MEETING_COLS} FROM meetings WHERE (?1 IS NULL OR folder=?1) ORDER BY created_at DESC LIMIT 2000"))?;
+        let mut st = c.prepare(&format!("SELECT {MEETING_COLS} FROM meetings WHERE deleted_at IS NULL AND (?1 IS NULL OR folder=?1) ORDER BY created_at DESC LIMIT 5000"))?;
         let v = st.query_map(params![folder], meeting_row)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(v)
     }
 
     /// Updates one text column (whitelisted) of a meeting.
     pub fn set(&self, id: &str, field: &str, value: &str) -> Result<()> {
-        const OK: &[&str] = &["title", "app", "status", "step", "template_id", "my_notes", "enhanced", "folder", "attendees", "speaker_names", "error", "started_at", "ended_at"];
+        const OK: &[&str] = &["title", "app", "status", "step", "template_id", "my_notes", "enhanced", "folder", "attendees", "speaker_names", "error", "started_at", "ended_at", "event_id"];
         if !OK.contains(&field) {
             anyhow::bail!("bad field {field}");
         }
@@ -197,13 +214,6 @@ impl Db {
         c.execute("DELETE FROM search WHERE meeting_id=?1", [id])?;
         c.execute("DELETE FROM meetings WHERE id=?1", [id])?;
         Ok(())
-    }
-
-    pub fn folders(&self) -> Result<Vec<String>> {
-        let c = self.c.lock();
-        let mut st = c.prepare("SELECT DISTINCT folder FROM meetings WHERE folder<>'' ORDER BY folder")?;
-        let v = st.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<Vec<String>>>()?;
-        Ok(v)
     }
 
     // ---------------- segments ----------------
@@ -294,7 +304,7 @@ impl Db {
         let c = self.c.lock();
         let mut st = c.prepare(
             "SELECT s.meeting_id, m.title, m.created_at, snippet(search, -1, '[', ']', ' … ', 14)
-             FROM search s JOIN meetings m ON m.id=s.meeting_id WHERE search MATCH ?1 ORDER BY rank LIMIT ?2",
+             FROM search s JOIN meetings m ON m.id=s.meeting_id WHERE search MATCH ?1 AND m.deleted_at IS NULL ORDER BY rank LIMIT ?2",
         )?;
         let v = st
             .query_map(params![fts, limit as i64], |r| Ok(Hit { meeting_id: r.get(0)?, title: r.get(1)?, created_at: r.get(2)?, snippet: r.get(3)? }))?

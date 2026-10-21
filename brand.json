@@ -1,10 +1,10 @@
 {
-  "name": "Toolbay Notes",
+  "name": "Cereal",
   "inspiredBy": {
     "name": "Granola",
     "company": "Granola",
     "logoUrl": "src/assets/inspired-by/granola.svg",
     "website": "https://www.granola.ai",
-    "notAffiliated": "Toolbay Notes is an independent open-source project and is not affiliated with or endorsed by Granola."
+    "notAffiliated": "Cereal is an independent open-source project and is not affiliated with or endorsed by Granola."
   }
 }

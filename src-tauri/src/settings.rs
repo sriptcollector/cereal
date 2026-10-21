@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use toolbay_engine::chat::Provider;
 use toolbay_engine::stt::CloudCfg;
 
-pub const DEFAULT_CONSENT: &str = "Heads up: I'm taking notes with Toolbay Notes, which transcribes this call on my computer to help me write up notes. Nothing is sent to a bot or a server. Let me know if you'd rather I didn't.";
+pub const DEFAULT_CONSENT: &str = "Heads up: I'm taking notes with Cereal, which transcribes this call on my computer to help me write up notes. Nothing is sent to a bot or a server. Let me know if you'd rather I didn't.";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -20,8 +20,14 @@ pub struct Settings {
     pub microphone: Option<String>,
     /// Record the computer's sound (the other people in the call).
     pub capture_system: bool,
-    /// Offer to start notes when a meeting app starts using the microphone.
-    pub detect_meetings: bool,
+    /// When a meeting app starts using the microphone: "record" (automatically, with a
+    /// visible indicator), "ask" (popup) or "nothing".
+    pub meeting_start: String,
+    /// Per-app overrides by friendly app name ("Zoom", "Slack huddle"…): "record" | "ask" |
+    /// "nothing" | "ignore".
+    pub app_rules: std::collections::BTreeMap<String, String>,
+    /// The first automatic recording shows the consent note; later ones don't.
+    pub auto_consent_shown: bool,
     /// Stop automatically a little after the meeting app stops using the microphone.
     pub auto_stop: bool,
     /// Show the "let others know" reminder each time recording starts.
@@ -33,6 +39,32 @@ pub struct Settings {
     pub keep_audio: String,
     pub launch_at_login: bool,
     pub sync_enabled: bool,
+
+    // ---- profile (improves notes) ----
+    pub job_title: String,
+    /// Free text about you and your work.
+    pub about: String,
+    /// "Sales", "Engineering", "Founder", … (picks suggested templates).
+    pub role: String,
+    /// Names and terms the speech model and notes should spell right.
+    pub vocabulary: Vec<String>,
+    /// Language the notes are written in: "auto" (the meeting's) or a code.
+    pub summary_language: String,
+
+    // ---- calendar ----
+    pub calendars: Vec<crate::calendar::CalendarSrc>,
+    /// Popup a minute before meetings with 2+ people.
+    pub calendar_popups: bool,
+    /// Move the Cereal window beside the call when a meeting starts.
+    pub reposition: bool,
+
+    // ---- data ----
+    /// Delete transcripts older than: "off" | "1d" | "1w" | "1m" | "3m" | "6m" | "1y".
+    pub transcript_retention: String,
+    /// "system" | "light" | "dark"
+    pub theme: String,
+    /// Early (pre-release) updates.
+    pub beta: bool,
 
     // ---- models (this computer only) ----
     /// "auto" | "manual"
@@ -60,7 +92,9 @@ impl Default for Settings {
             language: "auto".into(),
             microphone: None,
             capture_system: true,
-            detect_meetings: true,
+            meeting_start: "record".into(),
+            app_rules: Default::default(),
+            auto_consent_shown: false,
             auto_stop: true,
             consent_reminder: true,
             consent_message: DEFAULT_CONSENT.into(),
@@ -68,6 +102,17 @@ impl Default for Settings {
             keep_audio: "keep".into(),
             launch_at_login: true,
             sync_enabled: true,
+            job_title: String::new(),
+            about: String::new(),
+            role: String::new(),
+            vocabulary: vec![],
+            summary_language: "auto".into(),
+            calendars: vec![],
+            calendar_popups: true,
+            reposition: true,
+            transcript_retention: "off".into(),
+            theme: "system".into(),
+            beta: false,
             model_mode: "auto".into(),
             speech_model: "base.en-q5".into(),
             llm_model: "qwen3-1.7b".into(),
@@ -90,12 +135,23 @@ pub struct Synced {
     pub name: String,
     pub language: String,
     pub capture_system: bool,
-    pub detect_meetings: bool,
+    pub meeting_start: String,
+    pub app_rules: std::collections::BTreeMap<String, String>,
     pub auto_stop: bool,
     pub consent_reminder: bool,
     pub consent_message: String,
     pub default_template: String,
     pub keep_audio: String,
+    pub job_title: String,
+    pub about: String,
+    pub role: String,
+    pub vocabulary: Vec<String>,
+    pub summary_language: String,
+    pub calendars: Vec<crate::calendar::CalendarSrc>,
+    pub calendar_popups: bool,
+    pub reposition: bool,
+    pub transcript_retention: String,
+    pub theme: String,
 }
 
 impl Settings {
@@ -104,12 +160,23 @@ impl Settings {
             name: self.name.clone(),
             language: self.language.clone(),
             capture_system: self.capture_system,
-            detect_meetings: self.detect_meetings,
+            meeting_start: self.meeting_start.clone(),
+            app_rules: self.app_rules.clone(),
             auto_stop: self.auto_stop,
             consent_reminder: self.consent_reminder,
             consent_message: self.consent_message.clone(),
             default_template: self.default_template.clone(),
             keep_audio: self.keep_audio.clone(),
+            job_title: self.job_title.clone(),
+            about: self.about.clone(),
+            role: self.role.clone(),
+            vocabulary: self.vocabulary.clone(),
+            summary_language: self.summary_language.clone(),
+            calendars: self.calendars.clone(),
+            calendar_popups: self.calendar_popups,
+            reposition: self.reposition,
+            transcript_retention: self.transcript_retention.clone(),
+            theme: self.theme.clone(),
         }
     }
     pub fn apply_synced(&mut self, s: &Synced) {
@@ -118,7 +185,10 @@ impl Settings {
             self.language = s.language.clone();
         }
         self.capture_system = s.capture_system;
-        self.detect_meetings = s.detect_meetings;
+        if !s.meeting_start.is_empty() {
+            self.meeting_start = s.meeting_start.clone();
+        }
+        self.app_rules = s.app_rules.clone();
         self.auto_stop = s.auto_stop;
         self.consent_reminder = s.consent_reminder;
         if !s.consent_message.is_empty() {
@@ -130,6 +200,26 @@ impl Settings {
         if !s.keep_audio.is_empty() {
             self.keep_audio = s.keep_audio.clone();
         }
+        self.job_title = s.job_title.clone();
+        self.about = s.about.clone();
+        self.role = s.role.clone();
+        self.vocabulary = s.vocabulary.clone();
+        if !s.summary_language.is_empty() {
+            self.summary_language = s.summary_language.clone();
+        }
+        self.calendars = s.calendars.clone();
+        self.calendar_popups = s.calendar_popups;
+        self.reposition = s.reposition;
+        if !s.transcript_retention.is_empty() {
+            self.transcript_retention = s.transcript_retention.clone();
+        }
+        if !s.theme.is_empty() {
+            self.theme = s.theme.clone();
+        }
+    }
+    /// What to do when `app` starts a call.
+    pub fn rule_for(&self, app: &str) -> String {
+        self.app_rules.get(app).cloned().unwrap_or_else(|| self.meeting_start.clone())
     }
     pub fn me(&self) -> String {
         if self.name.trim().is_empty() { "You".into() } else { self.name.trim().to_string() }

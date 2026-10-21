@@ -1,9 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Toolbay Notes",
-  "mainBinaryName": "toolbay-notes",
+  "productName": "Cereal",
+  "mainBinaryName": "cereal",
   "version": "0.1.2",
-  "identifier": "ai.toolbay.notes",
+  "identifier": "ai.toolbay.cereal",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1447",
@@ -29,7 +29,7 @@
     "copyright": "MIT License",
     "category": "Productivity",
     "shortDescription": "Free, local AI meeting notes. No bot joins your call.",
-    "longDescription": "Toolbay Notes records your side and the other side of any call (Zoom, Google Meet, Teams, Slack) without a bot, transcribes it on your computer, tells speakers apart, and turns your rough notes into clean meeting notes with a local AI. Free and open source.",
+    "longDescription": "Cereal records your side and the other side of any call (Zoom, Google Meet, Teams, Slack) without a bot, transcribes it on your computer, tells speakers apart, and turns your rough notes into clean meeting notes with a local AI. Free and open source.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -45,7 +45,10 @@
     },
     "macOS": {
       "minimumSystemVersion": "13.0",
-      "infoPlist": "Info.plist"
+      "infoPlist": "Info.plist",
+      "signingIdentity": "-",
+      "hardenedRuntime": true,
+      "entitlements": "Entitlements.plist"
     },
     "resources": {
       "bundled/": "bundled/"
@@ -56,7 +59,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI0Mzk5NTQ0OEEwQUMzMUUKUldRZXd3cUtSSlU1dEpWWjNJZ0hOMDFYaGNwbHpjT3F6TG5YNGtJZXdLUTYrc1RaYmJQd2luN08K",
       "endpoints": [
-        "https://github.com/sriptcollector/toolbay-notes/releases/latest/download/latest.json"
+        "https://github.com/sriptcollector/cereal/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "quiet"
