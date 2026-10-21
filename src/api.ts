@@ -44,6 +44,7 @@ export interface Settings {
   hubspot_token: string;
   screen_snapshots: boolean;
   speaker_suggestions: boolean;
+  hot_corner: boolean;
   transcript_retention: string;
   theme: "system" | "light" | "dark";
   beta: boolean;

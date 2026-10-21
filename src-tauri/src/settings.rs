@@ -62,6 +62,8 @@ pub struct Settings {
     pub screen_snapshots: bool,
     /// Suggest speaker names from the meeting's attendees.
     pub speaker_suggestions: bool,
+    /// Bottom-left hot corner offers to start notes.
+    pub hot_corner: bool,
 
     // ---- profile (improves notes) ----
     pub job_title: String,
@@ -137,6 +139,7 @@ impl Default for Settings {
             hubspot_token: String::new(),
             screen_snapshots: false,
             speaker_suggestions: true,
+            hot_corner: false,
             job_title: String::new(),
             about: String::new(),
             role: String::new(),

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, CalEvent, Call, on, Settings } from "../api";
 import { copy, Icon, LOGO, useTheme } from "./ui";
 
-type Mode = { kind: "ask"; call: Call } | { kind: "auto"; app: string; meetingId: string; consent: boolean } | { kind: "event"; event: CalEvent } | { kind: "still" };
+type Mode = { kind: "ask"; call: Call } | { kind: "auto"; app: string; meetingId: string; consent: boolean } | { kind: "event"; event: CalEvent } | { kind: "still" } | { kind: "corner" };
 
 const hm = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
@@ -20,11 +20,13 @@ export default function Popup() {
     const b = on<{ app: string; meetingId: string; consent: boolean }>("auto-started", (x) => (setMode({ kind: "auto", ...x }), setBusy(false), api.getSettings().then(setS)));
     const c = on<{ event: CalEvent }>("event-starting", (x) => (setMode({ kind: "event", event: x.event }), setBusy(false)));
     const d = on("still-there", () => (setMode({ kind: "still" }), setBusy(false)));
+    const e2 = on("hot-corner", () => (setMode({ kind: "corner" }), setBusy(false)));
     return () => {
       a();
       b();
       c();
       d();
+      e2();
     };
   }, []);
   // An "auto-started" card without the consent note fades after 8 seconds.
@@ -48,6 +50,38 @@ export default function Popup() {
   }, [mode]);
 
   if (!mode) return <div className="popup adhoc" />;
+
+  if (mode.kind === "corner") {
+    return (
+      <div className="popup adhoc">
+        <div className="popup-head">
+          <img src={LOGO} alt="" />
+          <div style={{ minWidth: 0 }}>
+            <div className="popup-title">New note</div>
+            <div className="popup-sub">Start taking notes now?</div>
+          </div>
+        </div>
+        <div className="popup-actions">
+          <button className="btn ghost" onClick={() => api.popupAction(false)}>
+            Not now
+          </button>
+          <button
+            className="btn dark"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              api
+                .recordStart(null)
+                .then((m) => api.openHub(`meeting:${m.id}`))
+                .finally(() => api.popupAction(false));
+            }}
+          >
+            Start taking notes
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (mode.kind === "still") {
     return (

@@ -113,6 +113,31 @@ pub fn write_state(app: &AppHandle) {
 }
 
 /// Started by the Toolbay hub (it sets TOOLBAY_HUB=1 and passes --from-toolbay).
+/// Is a copy of Cereal already running (per running.json and a live pid)?
+pub fn already_running() -> bool {
+    let base = if cfg!(windows) {
+        std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_default()
+    } else {
+        std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library").join("Application Support")).unwrap_or_default()
+    };
+    let Ok(text) = std::fs::read_to_string(base.join("ai.toolbay.cereal").join("running.json")) else { return false };
+    let Some(pid) = serde_json::from_str::<serde_json::Value>(&text).ok().and_then(|v| v["pid"].as_u64()) else { return false };
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
+        use windows::Win32::System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+        let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid as u32) else { return false };
+        let mut code = 0u32;
+        let alive = GetExitCodeProcess(h, &mut code).is_ok() && code == STILL_ACTIVE.0 as u32;
+        let _ = CloseHandle(h);
+        alive
+    }
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new("kill").args(["-0", &pid.to_string()]).status().map(|s| s.success()).unwrap_or(false)
+    }
+}
+
 pub fn from_hub() -> bool {
     std::env::var("TOOLBAY_HUB").map(|v| v == "1").unwrap_or(false) || std::env::args().any(|a| a == "--from-toolbay")
 }

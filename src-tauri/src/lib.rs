@@ -1,6 +1,8 @@
 //! Cereal: free, local, open-source AI meeting notes. No bot joins your call.
 
 mod account;
+#[cfg(windows)]
+mod audio_route;
 mod calendar;
 mod capture;
 #[cfg(target_os = "macos")]
@@ -182,6 +184,15 @@ pub fn dock_beside_call(app: &AppHandle) {
     let _ = w.unmaximize();
     let _ = w.set_size(PhysicalSize::new(width, wa.size.height));
     let _ = w.set_position(PhysicalPosition::new(wa.position.x + wa.size.width as i32 - width as i32, wa.position.y));
+}
+
+/// Hot-corner card: start taking notes.
+pub fn show_corner_card(st: &St) {
+    let call = detect::Call { key: "corner".into(), app: String::new() };
+    show_popup(st, &call);
+    if let Some(app) = &st.app {
+        let _ = app.emit_to("popup", "hot-corner", ());
+    }
 }
 
 /// 14 minutes of silence: ask "Still there?" before stopping at 15.
@@ -395,6 +406,10 @@ fn recover(st: &St) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
+    // --quit / --stop / --hide with no copy running: nothing to do, don't start the app.
+    if args.iter().any(|a| a == "--quit" || a == "--stop" || a == "--hide") && !hub::already_running() {
+        return;
+    }
     if args.iter().any(|a| a == "--mcp") {
         std::process::exit(mcp::serve());
     }
@@ -457,6 +472,7 @@ pub fn run() {
             #[cfg(windows)]
             jumplist::set();
             quick::register(&handle, &st);
+            quick::hot_corner(handle.clone(), st.clone());
             engine::auto_setup(&st);
             detect::start(st.clone());
             calendar::start(st.clone());

@@ -383,6 +383,19 @@ fn find_input(host: &cpal::Host, name: &Option<String>) -> Option<cpal::Device> 
     }
 }
 
+/// The output to record: the device a call app is playing to (a headset that isn't the
+/// default, say), otherwise the default output.
+#[cfg(not(target_os = "macos"))]
+fn wanted_output(host: &cpal::Host) -> Option<cpal::Device> {
+    #[cfg(windows)]
+    if let Some(name) = crate::audio_route::call_output_device(crate::detect::is_call_exe) {
+        if let Some(d) = host.output_devices().ok()?.find(|d| d.name().map(|n| n == name).unwrap_or(false)) {
+            return Some(d);
+        }
+    }
+    host.default_output_device()
+}
+
 fn open_stream(dev: &cpal::Device, loopback: bool, track: Arc<Mutex<Track>>, clock: Arc<Mutex<Clock>>, failed: Arc<AtomicBool>) -> Result<cpal::Stream> {
     let cfg = if loopback { dev.default_output_config()? } else { dev.default_input_config()? };
     let channels = cfg.channels() as usize;
@@ -441,7 +454,7 @@ fn run(mic: Arc<Mutex<Track>>, sys: Arc<Mutex<Track>>, clock: Arc<Mutex<Clock>>,
 
     #[cfg(not(target_os = "macos"))]
     let open_sys = |host: &cpal::Host| -> Result<(cpal::Stream, String)> {
-        let dev = host.default_output_device().ok_or_else(|| anyhow!("No speakers or headphones found"))?;
+        let dev = wanted_output(host).ok_or_else(|| anyhow!("No speakers or headphones found"))?;
         let name = dev.name().unwrap_or_default();
         sys_failed.store(false, Ordering::SeqCst);
         Ok((open_stream(&dev, true, sys.clone(), clock.clone(), sys_failed.clone())?, name))
@@ -535,7 +548,7 @@ fn run(mic: Arc<Mutex<Track>>, sys: Arc<Mutex<Track>>, clock: Arc<Mutex<Clock>>,
             }
             #[cfg(not(target_os = "macos"))]
             if capture_system {
-                let want = host.default_output_device().and_then(|d| d.name().ok()).unwrap_or_default();
+                let want = wanted_output(&host).and_then(|d| d.name().ok()).unwrap_or_default();
                 if sys_failed.load(Ordering::SeqCst) || sys_stream.is_none() || (want != sys.lock().device && !want.is_empty()) {
                     drop(sys_stream.take());
                     match open_sys(&host) {

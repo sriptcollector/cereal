@@ -150,6 +150,9 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
           <Row title="Sounds" desc="A short chime when notes start, pause, resume and stop.">
             <Toggle on={s.sounds} onChange={(v) => save({ sounds: v })} />
           </Row>
+          <Row title="Hot corner" desc="Rest the pointer in the bottom-left corner of the screen to start taking notes.">
+            <Toggle on={s.hot_corner} onChange={(v) => save({ hot_corner: v })} />
+          </Row>
           <Row title="Quick chat (Alt+Space)" desc="Ask about your meetings from anywhere. Takes effect after restarting Cereal.">
             <Toggle on={s.quick_chat} onChange={(v) => save({ quick_chat: v })} />
           </Row>

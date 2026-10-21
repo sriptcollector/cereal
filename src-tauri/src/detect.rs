@@ -25,6 +25,14 @@ static SNOOZED: Lazy<Mutex<HashMap<String, Instant>>> = Lazy::new(|| Mutex::new(
 /// At most one "meeting detected" card every 2 minutes (as Granola).
 static LAST_CARD: Lazy<Mutex<Option<Instant>>> = Lazy::new(|| Mutex::new(None));
 
+/// A known call app (not a browser), for following its output device.
+pub fn is_call_exe(exe: &str) -> bool {
+    let e = exe.replace('\\', "#");
+    let b = e.rsplit('#').next().unwrap_or(&e).to_lowercase();
+    let browser = ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "vivaldi.exe", "arc.exe", "chromium.exe", "zen.exe", "comet.exe", "helium.exe"];
+    !browser.contains(&b.as_str()) && friendly(&e, &[]).is_some()
+}
+
 fn friendly(exe: &str, titles: &[String]) -> Option<String> {
     let e = exe.to_lowercase();
     let e = e.rsplit(['\\', '/', '#']).next().unwrap_or(&e).to_string();

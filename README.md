@@ -71,6 +71,9 @@ later. CPU only (same PC): transcript written live during the call, notes ~9 min
   Companies views; Trash with 30-day restore.
 - Import audio files (MP3, M4A, WAV, FLAC…) as notes. Export one note (Markdown, Word, PDF) or everything (CSV, JSON).
 - Vocabulary, profile and notes language; transcript retention; light and dark; Toolbay account sync; in-app feedback.
+- Your notes in other AI apps: a local MCP server (`cereal --mcp`, for Claude Desktop, Cursor…) and a CLI
+  (`cereal notes list | get | transcript | search`). Send to Notion, log in HubSpot, post to Slack, with your own keys.
+- Floating indicator with screenshot and live captions, Alt+Space quick chat, mini window, chimes, `cereal://` links.
 - Automatic model choice; optional cloud engines with your own key. No telemetry.
 
 The full checklist against Granola is in [docs/FEATURES.md](docs/FEATURES.md).

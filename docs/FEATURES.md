@@ -11,10 +11,10 @@ Granola 7.668.1 for Windows (installed with Orion's OK, never launched; ledger k
 | 1 | Bot-free capture, mic + system audio | Mac + Windows | ✅ WASAPI loopback (Windows, tested); ScreenCaptureKit (Mac, CI-built, untested) |
 | 2 | Me / Them labels | Yes | ✅ |
 | 3 | Diarization of the other side | No on desktop | ✅ Better: Speaker 1, 2… (sherpa-onnx), rename once |
-| 4 | Speaker names from the call app | Zoom/Teams/Meet | 🟡 From calendar attendees + rename; reading names off the call window ⬜ |
+| 4 | Speaker names from the call app | Zoom/Teams/Meet | 🟡 Suggested from attendees, 1:1s named in one click; reading names off the call window needs a real Zoom/Teams call to build against |
 | 5 | Mic picker (Automatic) | Yes | ✅ |
 | 6 | Echo handling on speakers | Mac only | ✅ Both |
-| 7 | Capture only the meeting app | No | ⬜ |
+| 7 | Follow the call's output device | Teams | ✅ Better: records whichever speakers/headset any call app plays to |
 | 8 | Live transcript: bubbles, copy, search | Yes | ✅ |
 | 9 | Delete transcript chunks | Yes | ✅ |
 | 10 | Edit transcript | No | ✅ Better |
@@ -24,7 +24,7 @@ Granola 7.668.1 for Windows (installed with Orion's OK, never launched; ledger k
 | 14 | Keep audio | Never | ✅ Keep / 30 days / delete after notes; in-app player ⬜ |
 | 15 | Languages, notes language | 31+ | ✅ 99 + notes language setting |
 | 16 | Custom vocabulary | 30 / 50 terms | ✅ Unlimited (speech prompt + notes) |
-| 17 | Shared-screen snapshots | Mac | ⬜ |
+| 17 | Shared-screen snapshots | Mac | ✅ Kept when the screen changes; add to notes or remove (off by default, like Granola) |
 | 18 | Works offline | No | ✅ |
 
 ## Detection and calendar
@@ -61,7 +61,7 @@ Granola 7.668.1 for Windows (installed with Orion's OK, never launched; ledger k
 | 41 | Model choice | Paid | ✅ Free |
 | 42 | Pre-meeting briefs | Paid | ✅ Free, from past notes with the same people |
 | 43 | Follow-up email | Paid | ✅ Recipe + "Email the notes" |
-| 44 | Chat actions (send email/Slack/calendar) | Yes | 🟡 Email draft (mailto), Slack via folder webhook |
+| 44 | Chat actions (send email/Slack/calendar) | Yes | ✅ Email draft, calendar event draft, post to a folder's Slack (asks first); suggested follow-up questions; live prompts |
 | 45 | Yearly recap | Yes | ✅ `/year` recipe |
 | — | File attachments in chat | Yes | ✅ |
 
@@ -77,9 +77,9 @@ Granola 7.668.1 for Windows (installed with Orion's OK, never launched; ledger k
 | 51 | Trash, 30-day restore | Yes | ✅ |
 | 52 | Share links | Hosted | ➖ |
 | 53 | Copy as Markdown / email | Yes | ✅ |
-| 54–55 | Slack / Notion / CRM / Zapier, folder auto-post | Partly paid | 🟡 Slack + any webhook (Zapier/Make/n8n) per folder; Notion/HubSpot direct ⬜ |
+| 54–55 | Slack / Notion / CRM / Zapier, folder auto-post | Partly paid | 🟡 Slack + any webhook (Zapier/Make/n8n) per folder, Send to Notion, Log in HubSpot (your own tokens); Attio, Affinity, Salesforce not yet |
 | 56 | Export | CSV by email, daily | ✅ Instant: MD, Word, PDF, all-notes CSV/JSON |
-| 57–58 | API / MCP | Paid | ⬜ |
+| 57–58 | API / MCP | Paid | ✅ Local MCP server (`cereal --mcp`) and CLI (`cereal notes …`), free and on this computer |
 | — | Folder files as context | Yes | ✅ txt/md/csv/json/html/docx |
 | — | Multi-select notes → ask | Yes | ✅ |
 
@@ -91,7 +91,7 @@ Granola 7.668.1 for Windows (installed with Orion's OK, never launched; ledger k
 | 60 | Transcript auto-delete periods | Yes | ✅ Same periods |
 | 61 | Training on your data | Opt-out | ✅ Never; no telemetry |
 | 62 | Consent message | Auto chat message | ✅ Reminder + copy message; first auto-record shows it |
-| 63–64 | Camera watermark, consent page | Yes / Enterprise | ⬜ / ➖ |
+| 63–64 | Camera watermark, consent page | Yes / Enterprise | ⬜ needs a signed virtual-camera component / ➖ |
 
 ## Platform and account
 
@@ -112,3 +112,17 @@ Granola 7.668.1 for Windows (installed with Orion's OK, never launched; ledger k
 | — | Keyboard shortcuts | Ctrl+K, J, N, F, [, comma, Shift+G | ✅ Same set |
 | — | Company in profile | Yes | ✅ Name and description, used by the notes AI |
 | — | Chat Enter key, events with no participants | Settings | ✅ |
+| — | Mini window, hot corner | Yes | ✅ Mini window (on top), bottom-left hot corner (off by default) |
+
+## Not matched yet, and why
+
+| Feature | Why | What Cereal does instead |
+|---|---|---|
+| Speaker names read from the Zoom/Teams/Meet window | Granola reads the active speaker through Windows UI Automation. That has to be built and tested against the real Zoom and Teams apps during a call. | Names suggested from the attendees; the other person in a 1:1 is named in one click. |
+| Recognising your own voice when everyone shares one mic | Needs voice enrolment (a speaker embedding of you) on top of the speaker models. Planned. | In calls, your mic is always you. In a room, everyone on the mic is labelled as you. |
+| Pasting the consent message into the call chat | Granola uses UI Automation and keystrokes to type into Zoom or Teams for you. It can't be tested without those apps, and it posts on your behalf. | The message is one click to copy, shown when recording starts. |
+| Camera watermark | Needs a signed virtual-camera driver (Windows) or camera extension (macOS, Apple Developer ID). | Consent reminder and message. |
+| Google / Microsoft sign-in for calendars | Needs OAuth apps registered and verified by Google and Microsoft under Orion's accounts. | Private iCal link, which works with Google, Outlook, iCloud and any other calendar, with no sign-in. |
+| Images sent to the notes AI | The local notes model reads text only. | Screens and images stay in the note next to the AI notes. |
+| Browser extension for Meet | Has to be published on the Chrome Web Store. | Meet, Teams and Zoom in the browser are detected by tab title. |
+| Attio, Affinity, Salesforce | Not built yet. | Webhooks (Zapier, Make, n8n) reach these. |
