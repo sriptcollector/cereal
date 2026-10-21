@@ -37,10 +37,26 @@ Toolbay app (the same list lives in toolbay-flow/AGENTS.md).
     serif headings (Newsreader), Inter for UI, light and dark following the system. Tokens live in
     `src/app/app.css` (`:root` / `[data-theme="dark"]`). A side-by-side check against Granola's
     press-kit screens is kept outside the repo (never commit Granola's screenshots).
-11. **Lives under the hub.** `toolbay.json` ships with each release. Supports `--from-toolbay`,
+11. **Reverse-engineer the original to match it (Orion's rule).** Use the
+    `reverse-engineer-anything` skill and its REA tools (`mcp__rea__*`) throughout the build:
+    trace how the original does a feature before building it (`analyze_javascript_application`
+    on its Electron app, `capture_electron_scenario` / `observe_web_session`,
+    `trace_application_feature`), then run behaviour parity checks against the real app. Track
+    coverage with `build_reconstruction_obligation_ledger` / `evaluate_reconstruction_coverage`
+    and record a **parity-coverage number in every release's notes** (and below). Clean-room
+    still applies (rule 8): we study behaviour; our code and assets are our own, and nothing
+    uses the original's servers. Never download the original without Orion's OK; never sign in
+    to it for him.
+12. **Lives under the hub.** `toolbay.json` ships with each release. Supports `--from-toolbay`,
     `--show`, `--hide`, `--quit`, `--start`, `--stop`, `--open <page>`, single instance,
     `running.json` ({pid, version, visible, window, updatedAt, hub, recording}) and the hub's
     `TOOLBAY_TOKEN` (memory only, never written to disk).
+
+## Parity coverage per release
+
+| Release | REA-verified coverage | Checklist (`docs/FEATURES.md`) | Notes |
+|---|---|---|---|
+| v0.2.1 | not measured | 63 ✅ · 4 🟡 · 4 ⬜ · 2 ➖ (by first mark per row) | Granola isn't installed on the build PC yet (needs Orion's OK to download); checklist built from public information only. |
 
 ## Cereal-specific rules
 
