@@ -53,6 +53,11 @@ pub struct Settings {
     /// About your company (helps the notes AI).
     pub company_name: String,
     pub company_about: String,
+    /// Notion: internal integration token and the page new notes go under (device only).
+    pub notion_token: String,
+    pub notion_page: String,
+    /// HubSpot private app token (device only).
+    pub hubspot_token: String,
 
     // ---- profile (improves notes) ----
     pub job_title: String,
@@ -123,6 +128,9 @@ impl Default for Settings {
             show_solo_events: true,
             company_name: String::new(),
             company_about: String::new(),
+            notion_token: String::new(),
+            notion_page: String::new(),
+            hubspot_token: String::new(),
             job_title: String::new(),
             about: String::new(),
             role: String::new(),

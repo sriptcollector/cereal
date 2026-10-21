@@ -1,6 +1,6 @@
 import { KeyboardEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { api, ChatMsg, on, Recipe, Source } from "../api";
-import { copy, Icon, toast, useRecipes } from "./ui";
+import { copy, Icon, Menu, toast, useFolders, useRecipes } from "./ui";
 import { Markdown } from "./md";
 
 // Settings › Chat: Enter sends (default) or Ctrl+Enter sends and Enter adds a line.
@@ -113,6 +113,7 @@ export function Thread({ t, onSource }: { t: ReturnType<typeof useThread>; onSou
               </div>
             )}
             <div className="tools">
+              <AnswerActions text={splitFollowUps(m.content)[0].replace(/\[\d+\]/g, "")} question={[...t.msgs].reverse().find((x) => x.role === "user" && x.id < m.id)?.content ?? ""} />
               <button className="icon-btn" title="Copy" onClick={() => copy(splitFollowUps(m.content)[0].replace(/\[\d+\]/g, ""))}>
                 {Icon.copy}
               </button>
@@ -124,6 +125,40 @@ export function Thread({ t, onSource }: { t: ReturnType<typeof useThread>; onSou
       {t.error && <div className="banner bad">{t.error}</div>}
       <div ref={end} />
     </div>
+  );
+}
+
+/** Draft actions under an answer (Granola's chat actions): each only opens a draft or asks first. */
+function AnswerActions({ text, question }: { text: string; question: string }) {
+  const [folders] = useFolders();
+  const hooks = folders.filter((f) => f.webhook.trim());
+  const subject = (question || text.split("\n")[0]).slice(0, 80);
+  return (
+    <>
+      <button className="icon-btn" title="Draft an email" onClick={() => window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text.slice(0, 1800))}`)}>
+        {Icon.share}
+      </button>
+      <button className="icon-btn" title="Draft a calendar event" onClick={() => api.calendarDraft(subject, text).catch((e) => toast(String(e)))}>
+        {Icon.calendar}
+      </button>
+      {hooks.length > 0 && (
+        <Menu label={Icon.slash} btnClass="icon-btn" title="Post to Slack">
+          {(close) =>
+            hooks.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => {
+                  close();
+                  if (window.confirm(`Post this answer to ${f.name}'s channel?`)) api.postText(f.id, text).then(() => toast("Posted"), (e) => toast(String(e)));
+                }}
+              >
+                {f.icon || "📁"} {f.name}
+              </button>
+            ))
+          }
+        </Menu>
+      )}
+    </>
   );
 }
 

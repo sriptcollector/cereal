@@ -312,6 +312,15 @@ cereal notes search <words>
 cereal folders list`}</pre>
           </div>
           <Row title="Slack and other apps" desc="Post a folder's new notes to Slack, Zapier, Make or n8n: open the folder and set its webhook." />
+          <Row title="Notion" desc="An internal integration token (notion.so/my-integrations) and the page notes go under (share that page with the integration). Then use Send to Notion on a note.">
+            <div style={{ display: "grid", gap: 6, width: 280 }}>
+              <input type="password" placeholder="Integration token" value={s.notion_token} onChange={(e) => save({ notion_token: e.target.value.trim() })} />
+              <input placeholder="Page link" value={s.notion_page} onChange={(e) => save({ notion_page: e.target.value.trim() })} />
+            </div>
+          </Row>
+          <Row title="HubSpot" desc="A private app token with notes and contacts access. Log in HubSpot attaches the notes to attendees who are contacts.">
+            <input type="password" style={{ width: 280 }} placeholder="Private app token" value={s.hubspot_token} onChange={(e) => save({ hubspot_token: e.target.value.trim() })} />
+          </Row>
         </Section>
 
         <Section title="AI models" id="ai" aside={status ? <span className="muted small">{status}</span> : undefined}>

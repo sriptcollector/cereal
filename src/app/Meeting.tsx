@@ -297,6 +297,14 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
                 <div className="menu-sep" />
                 <button onClick={() => (close(), exportMd())}>{Icon.doc} Save as Markdown</button>
                 <button onClick={() => (close(), exportDocx())}>{Icon.doc} Save as Word</button>
+                {settings.notion_token && (
+                  <button onClick={() => (close(), api.sendToNotion(id).then(() => toast("Sent to Notion"), (e) => toast(String(e))))}>{Icon.share} Send to Notion</button>
+                )}
+                {settings.hubspot_token && (
+                  <button onClick={() => (close(), api.sendToHubspot(id).then((n) => toast(n ? `Logged in HubSpot on ${n} contact${n === 1 ? "" : "s"}` : "Logged in HubSpot"), (e) => toast(String(e))))}>
+                    {Icon.share} Log in HubSpot
+                  </button>
+                )}
                 <button onClick={() => (close(), print())}>{Icon.doc} Save as PDF…</button>
                 <div className="menu-sep" />
                 <button onClick={() => (close(), copy(settings.consent_message, "Paste it in the meeting chat"))}>{Icon.shield} Copy “let others know” message</button>
@@ -316,6 +324,7 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
                 )}
                 {m.hasAudio && <button onClick={() => (close(), api.revealAudio(id))}>{Icon.folder} Show recording files</button>}
                 <button onClick={() => (close(), api.dock())}>{Icon.sidebar} Move beside the call</button>
+                <button onClick={() => (close(), api.miniWindow())}>{Icon.sidebar} Mini window (on top)</button>
                 <div className="menu-sep" />
                 <button className="danger" onClick={() => (close(), api.trash(id).then(() => (toast("Moved to trash"), go({ page: "home" }))))}>
                   {Icon.trash} Move to trash

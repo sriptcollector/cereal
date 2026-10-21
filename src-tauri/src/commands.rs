@@ -420,6 +420,35 @@ pub fn exe_path() -> String {
     std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_default()
 }
 
+/// Toggles the small always-on-top window; returns true when mini.
+#[tauri::command]
+pub fn mini_window(app: AppHandle) -> bool {
+    crate::mini_window(&app)
+}
+
+#[tauri::command]
+pub async fn send_to_notion(st: State<'_, St>, id: String) -> R<String> {
+    crate::connectors::to_notion(&st, &id).await.map_err(e)
+}
+
+#[tauri::command]
+pub async fn send_to_hubspot(st: State<'_, St>, id: String) -> R<usize> {
+    crate::connectors::to_hubspot(&st, &id).await.map_err(e)
+}
+
+#[tauri::command]
+pub async fn post_text(st: State<'_, St>, folder: String, text: String) -> R<()> {
+    crate::connectors::post_text(&st, &folder, &text).await.map_err(e)
+}
+
+/// Opens a calendar event draft in the default calendar app.
+#[tauri::command]
+pub fn calendar_draft(app: AppHandle, summary: String, details: String) -> R<()> {
+    let p = crate::connectors::calendar_draft(&summary, &details).map_err(e)?;
+    use tauri_plugin_opener::OpenerExt;
+    app.opener().open_path(p.display().to_string(), None::<&str>).map_err(e)
+}
+
 /// "Keep going" on the Still there? card.
 #[tauri::command]
 pub fn still_here(st: State<St>) {

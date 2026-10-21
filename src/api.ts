@@ -39,6 +39,9 @@ export interface Settings {
   show_solo_events: boolean;
   company_name: string;
   company_about: string;
+  notion_token: string;
+  notion_page: string;
+  hubspot_token: string;
   transcript_retention: string;
   theme: "system" | "light" | "dark";
   beta: boolean;
@@ -326,6 +329,11 @@ export const api = {
   syncStatus: () => invoke<[boolean, boolean]>("sync_status"),
   pillClick: () => invoke<void>("pill_click"),
   stillHere: () => invoke<void>("still_here"),
+  sendToNotion: (id: string) => invoke<string>("send_to_notion", { id }),
+  sendToHubspot: (id: string) => invoke<number>("send_to_hubspot", { id }),
+  postText: (folder: string, text: string) => invoke<void>("post_text", { folder, text }),
+  calendarDraft: (summary: string, details: string) => invoke<void>("calendar_draft", { summary, details }),
+  miniWindow: () => invoke<boolean>("mini_window"),
   exePath: () => invoke<string>("exe_path"),
   useVersion: (id: string, index: number) => invoke<void>("use_version", { id, index }),
   quickHide: () => invoke<void>("quick_hide"),

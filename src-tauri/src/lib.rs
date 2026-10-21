@@ -7,6 +7,7 @@ mod capture;
 mod capture_mac;
 mod cli;
 mod commands;
+mod connectors;
 mod db;
 mod detect;
 mod engine;
@@ -190,6 +191,32 @@ pub fn show_still_there(st: &St) {
     if let Some(app) = &st.app {
         let _ = app.emit_to("popup", "still-there", ());
     }
+}
+
+/// Granola's mini window: a small always-on-top note in the top-right corner; again
+/// restores the normal window.
+pub fn mini_window(app: &AppHandle) -> bool {
+    static NORMAL: std::sync::Mutex<Option<(PhysicalPosition<i32>, PhysicalSize<u32>)>> = std::sync::Mutex::new(None);
+    let Some(w) = app.get_webview_window("main") else { return false };
+    let mut normal = NORMAL.lock().unwrap();
+    if let Some((pos, size)) = normal.take() {
+        let _ = w.set_always_on_top(false);
+        let _ = w.set_size(size);
+        let _ = w.set_position(pos);
+        return false;
+    }
+    let Ok(Some(mon)) = w.current_monitor() else { return false };
+    if let (Ok(pos), Ok(size)) = (w.outer_position(), w.outer_size()) {
+        *normal = Some((pos, size));
+    }
+    let wa = mon.work_area();
+    let s = mon.scale_factor();
+    let size = PhysicalSize::new((360.0 * s) as u32, (520.0 * s) as u32);
+    let _ = w.unmaximize();
+    let _ = w.set_size(size);
+    let _ = w.set_position(PhysicalPosition::new(wa.position.x + wa.size.width as i32 - size.width as i32 - (24.0 * s) as i32, wa.position.y + (24.0 * s) as i32));
+    let _ = w.set_always_on_top(true);
+    true
 }
 
 pub fn hide_popup(st: &St) {
@@ -495,6 +522,11 @@ pub fn run() {
             commands::sync_status,
             commands::pill_click,
             commands::still_here,
+            commands::send_to_notion,
+            commands::send_to_hubspot,
+            commands::post_text,
+            commands::calendar_draft,
+            commands::mini_window,
             commands::exe_path,
             commands::use_version,
             commands::quick_hide,
