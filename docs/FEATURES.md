@@ -1,7 +1,7 @@
 # Parity checklist: Cereal vs. Granola
 
-Source: `toolbay-research/granola-report.pdf` (public information; Granola was not installed), and Granola's public
-press-kit screenshots (compared side by side outside this repo).
+Source: `toolbay-research/granola-report.pdf`, Granola's public press-kit screenshots, and a static REA study of
+Granola 7.668.1 for Windows (installed with Orion's OK, never launched; ledger kept outside this repo).
 ✅ done · 🟡 partly · ⬜ not yet · ➖ out of scope (needs a hosted server, or a phone).
 
 ## Capture
@@ -19,7 +19,7 @@ press-kit screenshots (compared side by side outside this repo).
 | 9 | Delete transcript chunks | Yes | ✅ |
 | 10 | Edit transcript | No | ✅ Better |
 | 11 | Pause / resume / resume later | Yes | ✅ |
-| 12 | Auto-stop (call ended, 15 min silence) | Yes | ✅ (+ false-alarm cleanup) |
+| 12 | Auto-stop (call ended, 15 min silence) | Yes | ✅ Same rules: 3 s after the app lets go, at the event's end, "Still there?" before the silence stop (+ false-alarm cleanup) |
 | 13 | Import audio | No | ✅ Better |
 | 14 | Keep audio | Never | ✅ Keep / 30 days / delete after notes; in-app player ⬜ |
 | 15 | Languages, notes language | 31+ | ✅ 99 + notes language setting |
@@ -33,13 +33,13 @@ press-kit screenshots (compared side by side outside this repo).
 |---|---|---|---|
 | 19 | Google + Microsoft calendar | OAuth | ✅ Private iCal link (no sign-in, local) |
 | 20 | Apple / ICS / CalDAV | No | ✅ Any iCal feed |
-| 21 | Popup 1 min before (2+ people) | Yes | ✅ Join & take notes |
+| 21 | Popup 1 min before | Yes | ✅ 58 s before, hides 4 min in, skips declined/all-day; Join opens Zoom links in the Zoom app |
 | 22 | Detect calls by mic use | Yes | ✅ Windows (incl. browser calls by tab title); Mac 14.2+ per-app |
 | 23 | Link ad-hoc call to calendar event | 15 min | ✅ |
 | 24 | Per-app notification toggles | Yes | ✅ Record / Ask / Ignore per app |
 | 25 | Move window beside the call | Yes | ✅ |
-| 26 | Floating indicator | Yes | ✅ With Pause and Stop |
-| 27 | Tray / menu bar with next meeting | Mac opt-in | ✅ Tray shows next meeting |
+| 26 | Floating indicator | Yes | ✅ Pause, Stop, screenshot into the note, live captions; on/off setting |
+| 27 | Tray / menu bar with next meeting | Mac opt-in | ✅ Today's meetings, next one in the tooltip, Restart |
 | 28 | Auto-record all meetings | No | ✅ Default (Orion), never silent |
 
 ## Notes and AI
@@ -52,7 +52,7 @@ press-kit screenshots (compared side by side outside this repo).
 | 32 | Source view per point | Magnifier | ✅ Magnifier per line → transcript lines |
 | 33 | Templates | ~29 | ✅ 26 + custom |
 | 34 | Custom template as default | No | ✅ |
-| 35 | Switch template / regenerate, `/` in notes | Yes | ✅ |
+| 35 | Switch template / regenerate, `/` in notes | Yes | ✅ Grouped picker with Recent and search; each template's notes kept as a tab; rewrite asks first |
 | 36 | Rewrite / edit notes | Yes | ✅ Edit inline; rewrite via chat |
 | 37 | Chat scopes | meeting, live, folder, selected, person, company, all | ✅ All of these |
 | 38 | Chat citations | Yes | ✅ Numbered, clickable |
@@ -70,10 +70,10 @@ press-kit screenshots (compared side by side outside this repo).
 | # | Feature | Granola | Cereal |
 |---|---|---|---|
 | 46 | Home: Coming up + notes by day | Yes | ✅ |
-| 47 | Spaces / folders | Spaces + 1 level | 🟡 My notes + folders (icons, description); nested folders ⬜ |
+| 47 | Spaces / folders | Spaces + 1 level | ✅ My notes + folders with one level of subfolders, stars, icons, description |
 | 48 | Auto-file recurring meetings | Yes | ✅ Title rule per folder |
 | 49 | People / Companies | Enriched online | ✅ From attendees (no outside data) |
-| 50 | Search | Yes | ✅ Ctrl+K full-text |
+| 50 | Search | Yes | ✅ Ctrl+K full-text, Ctrl+F in a note |
 | 51 | Trash, 30-day restore | Yes | ✅ |
 | 52 | Share links | Hosted | ➖ |
 | 53 | Copy as Markdown / email | Yes | ✅ |
@@ -106,3 +106,9 @@ press-kit screenshots (compared side by side outside this repo).
 | — | Onboarding: role, calendar, permissions | Yes | ✅ Name, role (picks default template), calendar, audio test, auto-record choice + consent |
 | — | Profile context for notes | Yes | ✅ Name, job title, about you |
 | — | Feedback | In-app | ✅ To toolbay.ai |
+| — | Sounds on start / pause / resume | Yes | ✅ Own chimes, can be turned off |
+| — | Quick chat from anywhere | Alt+Space | ✅ Alt+Space |
+| — | Deep links, jump list | granola://, Windows tasks | ✅ cereal://, Windows jump list |
+| — | Keyboard shortcuts | Ctrl+K, J, N, F, [, comma, Shift+G | ✅ Same set |
+| — | Company in profile | Yes | ✅ Name and description, used by the notes AI |
+| — | Chat Enter key, events with no participants | Settings | ✅ |

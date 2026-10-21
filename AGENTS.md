@@ -57,6 +57,7 @@ Toolbay app (the same list lives in toolbay-flow/AGENTS.md).
 | Release | REA-verified coverage | Checklist (`docs/FEATURES.md`) | Notes |
 |---|---|---|---|
 | v0.2.1 | 46% matched, 62% weighted (35 M · 25 P · 16 G of 76) | 63 ✅ · 4 🟡 · 4 ⬜ · 2 ➖ | First REA ledger, from a static study of Granola 7.668.1 for Windows (installed with Orion's OK, never launched). The 78-item ledger lives outside the repo. |
+| v0.3.0 | 76% matched, 82% weighted (58 M · 9 P · 9 G of 76) | see docs/FEATURES.md | Auto-stop rules, calendar popup rules, indicator screenshot + captions, Still there?, sounds, quick chat, deep links, jump list, shortcuts, template picker + versions, subfolders, stars. |
 
 ## Cereal-specific rules
 
