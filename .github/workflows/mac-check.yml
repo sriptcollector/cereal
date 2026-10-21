@@ -50,6 +50,5 @@ jobs:
           if kill -0 $pid 2>/dev/null; then echo "app running after 15 s"; kill $pid; else echo "app exited:"; cat launch.log; fi
           echo "== bundled engines start"
           for e in $(find "$app/Contents/Resources/bundled/engines" -type f -perm +111 -name "*-server" -o -type f -name "sherpa-onnx-offline-speaker-diarization"); do
-            "$e" --help > out.txt 2>&1; echo "$(basename "$e"): exit $?  $(head -c 200 out.txt | tr '
-' ' ')"
+            "$e" --help > out.txt 2>&1; echo "$(basename "$e"): exit $?  $(head -c 200 out.txt | tr -s '[:space:]' ' ')"
           done
