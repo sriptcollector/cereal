@@ -201,7 +201,20 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "/Applications/Cereal.app"
           if xattr -p com.apple.quarantine "/Applications/Cereal.app" 2>/dev/null; then echo "installed app is quarantined"; exit 1; fi
           echo "Installed app is clean."
-          gh release upload "$GITHUB_REF_NAME" "$out" --clobber
+          # Fixed-name copy so /releases/latest/download/Cereal_<arch>.pkg always works.
+          cp "$out" "Cereal_${arch}.pkg"
+          gh release upload "$GITHUB_REF_NAME" "$out" "Cereal_${arch}.pkg" --clobber
+
+      - name: Fixed-name Windows installer
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          exe=$(ls target/release/bundle/nsis/*-setup.exe | head -1)
+          cp "$exe" Cereal_x64-setup.exe
+          gh release upload "$GITHUB_REF_NAME" Cereal_x64-setup.exe --clobber
           if [ -n "${APPLE_ID:-}" ]; then
             spctl --assess --type execute --verbose=4 "$app"
             xcrun stapler validate "$app"
