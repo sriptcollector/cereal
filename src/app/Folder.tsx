@@ -10,6 +10,7 @@ const ICONS = ["📁", "🤝", "🧑‍💻", "📈", "🎯", "📣", "💡", "�
 
 export default function FolderPage({ id, go, tab: initialTab }: { id: string; go: Go; tab?: string }) {
   const [f, setF] = useState<Folder | null>(null);
+  const [subs, setSubs] = useState<Folder[]>([]);
   const [tab, setTab] = useState<"notes" | "files" | "companies" | "people">((initialTab as "notes") || "notes");
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -17,7 +18,7 @@ export default function FolderPage({ id, go, tab: initialTab }: { id: string; go
   const thread = useThread("folder", id);
 
   const load = () => {
-    api.folders().then((fs) => setF(fs.find((x) => x.id === id) ?? null));
+    api.folders().then((fs) => (setF(fs.find((x) => x.id === id) ?? null), setSubs(fs.filter((x) => x.parentId === id))));
     api.meetings(id).then(setMeetings);
     api.files(id).then(setFiles);
   };
@@ -88,6 +89,20 @@ export default function FolderPage({ id, go, tab: initialTab }: { id: string; go
         <div className="spacer" />
         <Menu label={Icon.more} btnClass="icon-btn">
           {(close) => (
+            <>
+            <button onClick={() => (save({ favorite: !f.favorite }), close())}>{f.favorite ? "☆ Remove star" : "★ Star folder"}</button>
+            {!f.parentId && (
+              <button
+                onClick={async () => {
+                  close();
+                  const sub = await api.saveFolder({ name: "New subfolder", icon: "📁", parentId: id });
+                  go({ page: "folder", id: sub.id });
+                }}
+              >
+                {Icon.plus} New subfolder
+              </button>
+            )}
+            {f.parentId && <button onClick={() => (save({ parentId: "" }), close())}>Move to top level</button>}
             <button
               className="danger"
               onClick={async () => {
@@ -98,6 +113,7 @@ export default function FolderPage({ id, go, tab: initialTab }: { id: string; go
             >
               {Icon.trash} Delete folder (notes stay)
             </button>
+            </>
           )}
         </Menu>
       </div>
@@ -146,6 +162,15 @@ export default function FolderPage({ id, go, tab: initialTab }: { id: string; go
           ))}
         </div>
 
+        {tab === "notes" && subs.length > 0 && (
+          <div className="subfolders">
+            {subs.map((x) => (
+              <button key={x.id} className="subfolder" onClick={() => go({ page: "folder", id: x.id })}>
+                <span>{x.icon || "📁"}</span> {x.name} <span className="muted small">{x.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {tab === "notes" &&
           (meetings.length ? (
             <NotesByDay meetings={meetings} go={go} />

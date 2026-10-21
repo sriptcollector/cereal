@@ -38,6 +38,12 @@ pub struct Folder {
     pub created_at: String,
     #[serde(default)]
     pub count: i64,
+    /// Subfolder of this folder ("" = top level). One level deep, like Granola.
+    #[serde(default)]
+    pub parent_id: String,
+    /// Starred: listed first in the sidebar.
+    #[serde(default)]
+    pub favorite: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -159,6 +165,8 @@ fn folder_row(r: &rusqlite::Row) -> rusqlite::Result<Folder> {
         webhook: r.get(6)?,
         created_at: r.get(7)?,
         count: r.get(8)?,
+        parent_id: r.get(9)?,
+        favorite: r.get::<_, i64>(10)? != 0,
     })
 }
 
@@ -186,7 +194,7 @@ impl Db {
         let c = self.c.lock();
         let mut st = c.prepare(
             "SELECT f.id,f.name,f.icon,f.description,f.sort,f.auto_match,f.webhook,f.created_at,
-             (SELECT COUNT(*) FROM meetings m WHERE m.folder=f.id AND m.deleted_at IS NULL)
+             (SELECT COUNT(*) FROM meetings m WHERE m.folder=f.id AND m.deleted_at IS NULL), f.parent_id, f.favorite
              FROM folders f ORDER BY f.sort, f.created_at",
         )?;
         let v = st.query_map([], folder_row)?.collect::<rusqlite::Result<Vec<_>>>()?;
@@ -203,17 +211,27 @@ impl Db {
             f.id = uuid::Uuid::new_v4().to_string();
             f.created_at = now();
         }
+        // Only one level of subfolders, and never inside itself.
+        if !f.parent_id.is_empty() {
+            let parent = self.folder(&f.parent_id)?;
+            if f.parent_id == f.id || parent.map(|p| !p.parent_id.is_empty()).unwrap_or(true) || self.folders()?.iter().any(|x| x.parent_id == f.id) {
+                f.parent_id.clear();
+            }
+        }
         self.c.lock().execute(
-            "INSERT INTO folders(id,name,icon,description,sort,auto_match,webhook,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)
-             ON CONFLICT(id) DO UPDATE SET name=?2,icon=?3,description=?4,sort=?5,auto_match=?6,webhook=?7",
-            params![f.id, f.name, f.icon, f.description, f.sort, f.auto_match, f.webhook, if f.created_at.is_empty() { now() } else { f.created_at.clone() }],
+            "INSERT INTO folders(id,name,icon,description,sort,auto_match,webhook,created_at,parent_id,favorite) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
+             ON CONFLICT(id) DO UPDATE SET name=?2,icon=?3,description=?4,sort=?5,auto_match=?6,webhook=?7,parent_id=?9,favorite=?10",
+            params![f.id, f.name, f.icon, f.description, f.sort, f.auto_match, f.webhook, if f.created_at.is_empty() { now() } else { f.created_at.clone() }, f.parent_id, f.favorite as i64],
         )?;
         Ok(f)
     }
 
     /// Deletes a folder; its notes stay (back in My notes).
+    /// Subfolders move up to the deleted folder's parent (as in Granola).
     pub fn delete_folder(&self, id: &str) -> Result<()> {
+        let parent = self.folder(id)?.map(|f| f.parent_id).unwrap_or_default();
         let c = self.c.lock();
+        c.execute("UPDATE folders SET parent_id=?2 WHERE parent_id=?1", params![id, parent])?;
         c.execute("UPDATE meetings SET folder='' WHERE folder=?1", [id])?;
         c.execute("DELETE FROM files WHERE folder_id=?1", [id])?;
         c.execute("DELETE FROM folders WHERE id=?1", [id])?;
@@ -493,5 +511,19 @@ mod tests {
         db.add_thread_msg(&t.id, "user", "hi").unwrap();
         assert_eq!(db.thread_msgs(&t.id).unwrap().len(), 1);
         assert!(db.recipes().unwrap().len() >= 10);
+    }
+
+    #[test]
+    fn subfolders_one_level() {
+        let db = crate::db::Db::open(std::path::Path::new(":memory:")).unwrap();
+        let top = db.save_folder(&Folder { name: "Clients".into(), ..Default::default() }).unwrap();
+        let sub = db.save_folder(&Folder { name: "Acme".into(), parent_id: top.id.clone(), ..Default::default() }).unwrap();
+        assert_eq!(sub.parent_id, top.id);
+        // No third level.
+        let deep = db.save_folder(&Folder { name: "Deep".into(), parent_id: sub.id.clone(), ..Default::default() }).unwrap();
+        assert!(deep.parent_id.is_empty());
+        // Deleting the parent moves the subfolder up.
+        db.delete_folder(&top.id).unwrap();
+        assert!(db.folder(&sub.id).unwrap().unwrap().parent_id.is_empty());
     }
 }

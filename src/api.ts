@@ -70,6 +70,7 @@ export interface Meeting {
   templateId: string;
   myNotes: string;
   enhanced: string;
+  versions: string;
   folder: string;
   attendees: string;
   speakerNames: string;
@@ -112,6 +113,8 @@ export interface Folder {
   webhook: string;
   createdAt: string;
   count: number;
+  parentId: string;
+  favorite: boolean;
 }
 
 export interface FileItem {
@@ -323,6 +326,7 @@ export const api = {
   syncStatus: () => invoke<[boolean, boolean]>("sync_status"),
   pillClick: () => invoke<void>("pill_click"),
   stillHere: () => invoke<void>("still_here"),
+  useVersion: (id: string, index: number) => invoke<void>("use_version", { id, index }),
   quickHide: () => invoke<void>("quick_hide"),
   pillWide: (wide: boolean) => invoke<void>("pill_wide", { wide }),
   screenshot: () => invoke<void>("screenshot"),

@@ -171,13 +171,18 @@ export default function App() {
               {Icon.lock}
               <span className="t">My notes</span>
             </button>
-            {folders.map((f) => (
-              <button key={f.id} className={is("folder", (r) => (r as { id: string }).id === f.id) ? "on" : ""} onClick={() => go({ page: "folder", id: f.id })}>
-                <span className="emoji">{f.icon || "📁"}</span>
-                <span className="t">{f.name}</span>
-                {f.count > 0 && <span className="count">{f.count}</span>}
-              </button>
-            ))}
+            {/* Starred folders first, subfolders under their folder. */}
+            {[...folders.filter((f) => !f.parentId)]
+              .sort((a, b) => Number(b.favorite) - Number(a.favorite))
+              .flatMap((f) => [f, ...folders.filter((c) => c.parentId === f.id)])
+              .map((f) => (
+                <button key={f.id} className={`${f.parentId ? "sub" : ""} ${is("folder", (r) => (r as { id: string }).id === f.id) ? "on" : ""}`} onClick={() => go({ page: "folder", id: f.id })}>
+                  <span className="emoji">{f.icon || "📁"}</span>
+                  <span className="t">{f.name}</span>
+                  {f.favorite && <span className="star">★</span>}
+                  {f.count > 0 && <span className="count">{f.count}</span>}
+                </button>
+              ))}
           </nav>
           <div className="side-label">
             <span>More</span>

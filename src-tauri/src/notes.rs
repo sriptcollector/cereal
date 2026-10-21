@@ -318,6 +318,15 @@ pub async fn enhance(st: &St, id: &str, template_id: Option<String>) -> Result<S
     if notes.trim().is_empty() {
         return Err(anyhow!("the AI model returned empty notes"));
     }
+    // Switching template keeps the earlier notes as their own tab (like Granola).
+    if !m.enhanced.trim().is_empty() && tpl.id != m.template_id {
+        let mut v: Vec<serde_json::Value> = serde_json::from_str(&m.versions).unwrap_or_default();
+        let old_name = template(st, &m.template_id).name;
+        v.retain(|x| x["templateId"] != m.template_id.as_str() && x["templateId"] != tpl.id.as_str());
+        v.insert(0, serde_json::json!({"templateId": m.template_id, "name": old_name, "notes": m.enhanced, "at": crate::db::now()}));
+        v.truncate(8);
+        st.db.set(id, "versions", &serde_json::to_string(&v)?)?;
+    }
     st.db.set(id, "enhanced", notes.trim())?;
     if m.title.trim().is_empty() {
         if let Some(t) = title {
@@ -446,7 +455,15 @@ fn meeting_context(st: &St, m: &Meeting, budget_chars: usize, question: &str, n:
 fn scope_meetings(st: &St, scope: &str, scope_id: &str, question: &str) -> Result<Vec<Meeting>> {
     Ok(match scope {
         "meeting" => st.db.meeting(scope_id)?.into_iter().collect(),
-        "folder" => st.db.meetings(Some(scope_id))?.into_iter().take(20).collect(),
+        "folder" => {
+            // A folder includes its subfolders' notes.
+            let mut v = st.db.meetings(Some(scope_id))?;
+            for sub in st.db.folders()?.into_iter().filter(|f| f.parent_id == scope_id) {
+                v.extend(st.db.meetings(Some(&sub.id))?);
+            }
+            v.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            v.into_iter().take(20).collect()
+        }
         "person" => st.db.meetings_with(Some(scope_id), None)?.into_iter().take(20).collect(),
         "company" => st.db.meetings_with(None, Some(scope_id))?.into_iter().take(20).collect(),
         "selected" => scope_id.split(',').filter_map(|id| st.db.meeting(id.trim()).ok().flatten()).collect(),

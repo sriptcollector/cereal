@@ -149,3 +149,95 @@ export default function Templates() {
     </Page>
   );
 }
+
+// ---------------- picker (Granola-style: recent, mine, then by category) ----------------
+
+const CATEGORY: Record<string, string> = {
+  auto: "General",
+  "team-meeting": "Team",
+  "weekly-team": "Team",
+  standup: "Team",
+  "sprint-planning": "Team",
+  retro: "Team",
+  brainstorm: "Team",
+  "all-hands": "Team",
+  "design-crit": "Team",
+  "project-kickoff": "Team",
+  "one-on-one": "People",
+  coaching: "People",
+  interview: "Hiring",
+  "interview-debrief": "Hiring",
+  "sales-call": "Sales",
+  discovery: "Sales",
+  "pipeline-review": "Sales",
+  "customer-check-in": "Customers",
+  onboarding: "Customers",
+  "customer-discovery": "Research",
+  "research-interview": "Research",
+  pitch: "Investors",
+  "investor-update": "Investors",
+  "board-meeting": "Investors",
+  podcast: "Other",
+  lecture: "Other",
+};
+const ORDER = ["General", "Team", "People", "Sales", "Customers", "Research", "Hiring", "Investors", "Other"];
+const USE_KEY = "cereal.templateUse";
+
+/** Remembers when a template was used (for the Recent row). */
+export function recordTemplateUse(id: string) {
+  try {
+    const m = JSON.parse(localStorage.getItem(USE_KEY) || "{}");
+    m[id] = Date.now();
+    localStorage.setItem(USE_KEY, JSON.stringify(m));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function TemplatePicker({ templates, current, onPick }: { templates: Template[]; current: string; onPick: (id: string) => void }) {
+  const [q, setQ] = useState("");
+  const use: Record<string, number> = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(USE_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  })();
+  const match = (t: Template) => !q || `${t.name} ${t.description}`.toLowerCase().includes(q.toLowerCase());
+  const shown = templates.filter(match);
+  const recent = q ? [] : [...templates].filter((t) => use[t.id]).sort((a, b) => use[b.id] - use[a.id]).slice(0, 5);
+  const mine = shown.filter((t) => !t.builtin);
+  const groups = ORDER.map((g) => [g, shown.filter((t) => t.builtin && (CATEGORY[t.id] ?? "Other") === g)] as const).filter(([, v]) => v.length);
+  const item = (t: Template) => (
+    <button key={t.id} className={`tpl ${t.id === current ? "on" : ""}`} onClick={() => (recordTemplateUse(t.id), onPick(t.id))}>
+      <div className="tpl-name">{t.name}</div>
+      <div className="tpl-desc">{t.description}</div>
+    </button>
+  );
+  return (
+    <>
+      <input className="tpl-search" autoFocus placeholder="Search templates" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="tpl-list" style={{ maxHeight: "50vh" }}>
+        {recent.length > 0 && (
+          <>
+            <div className="tpl-group">Recent</div>
+            {recent.map(item)}
+          </>
+        )}
+        {mine.length > 0 && (
+          <>
+            <div className="tpl-group">My templates</div>
+            {mine.map(item)}
+          </>
+        )}
+        {groups.map(([g, v]) => (
+          <div key={g} style={{ display: "contents" }}>
+            <div className="tpl-group">{g}</div>
+            {v.map(item)}
+          </div>
+        ))}
+        {shown.length === 0 && <div className="muted">No template matches.</div>}
+      </div>
+    </>
+  );
+}

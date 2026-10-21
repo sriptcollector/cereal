@@ -396,6 +396,24 @@ pub fn quick_hide(app: AppHandle) {
     }
 }
 
+/// Makes an earlier version (other template) the current notes; the current ones become a tab.
+#[tauri::command]
+pub fn use_version(st: State<St>, id: String, index: usize) -> R<()> {
+    let m = st.db.meeting(&id).map_err(e)?.ok_or("missing note")?;
+    let mut v: Vec<serde_json::Value> = serde_json::from_str(&m.versions).unwrap_or_default();
+    if index >= v.len() {
+        return Err("That version is gone.".into());
+    }
+    let pick = v.remove(index);
+    let cur_name = crate::notes::template(&st, &m.template_id).name;
+    v.insert(0, serde_json::json!({"templateId": m.template_id, "name": cur_name, "notes": m.enhanced, "at": crate::db::now()}));
+    st.db.set(&id, "enhanced", pick["notes"].as_str().unwrap_or_default()).map_err(e)?;
+    st.db.set(&id, "template_id", pick["templateId"].as_str().unwrap_or("auto")).map_err(e)?;
+    st.db.set(&id, "versions", &serde_json::to_string(&v).map_err(e)?).map_err(e)?;
+    st.meeting_changed(&id);
+    Ok(())
+}
+
 /// "Keep going" on the Still there? card.
 #[tauri::command]
 pub fn still_here(st: State<St>) {

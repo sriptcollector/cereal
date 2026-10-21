@@ -5,6 +5,7 @@ import { copy, dayLabel, Icon, Menu, Modal, timeOf, toast, useFolders, useSettin
 import { fmtDur, fmtMinutes, Markdown } from "./md";
 import AskBar, { Thread, useThread } from "./ChatBar";
 import NoteEditor from "./Editor";
+import { TemplatePicker } from "./Templates";
 
 function useDebounced<T>(fn: (v: T) => void, ms: number) {
   const t = useRef<number | undefined>(undefined);
@@ -49,6 +50,7 @@ function findNext(q: string, backwards: boolean) {
 export default function MeetingPage({ id, go, panel }: { id: string; go: Go; panel?: string }) {
   const [m, setM] = useState<Meeting | null>(null);
   const [find, setFind] = useState<string | null>(null);
+  const [verIdx, setVerIdx] = useState(-1);
   const keys = useRef<((e: KeyboardEvent) => void) | null>(null);
   const [segs, setSegs] = useState<Segment[]>([]);
   const [rec, setRec] = useState<RecState | null>(null);
@@ -212,6 +214,13 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
 
   const aiText = streamNotes ? streamNotes.replace(/^\s*Title:.*\n?/i, "") : m.enhanced;
   const showAi = view === "ai" && (m.enhanced || streamNotes);
+  const versions: { templateId: string; name: string; notes: string }[] = (() => {
+    try {
+      return JSON.parse(m.versions || "[]");
+    } catch {
+      return [];
+    }
+  })();
 
   return (
     <div className={`meeting ${showTx ? "with-tx" : ""}`}>
@@ -410,7 +419,34 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
               </div>
             )}
 
-            {showAi ? (
+            {showAi && versions.length > 0 && !processing && (
+              <div className="ver-tabs">
+                <button className={verIdx < 0 ? "on" : ""} onClick={() => setVerIdx(-1)}>
+                  {tplName}
+                </button>
+                {versions.map((v, i) => (
+                  <button key={i} className={verIdx === i ? "on" : ""} onClick={() => setVerIdx(i)}>
+                    {v.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {showAi && verIdx >= 0 && versions[verIdx] ? (
+              <div className="ver-view">
+                <Markdown md={versions[verIdx].notes} />
+                <button
+                  className="btn"
+                  onClick={() =>
+                    api.useVersion(id, verIdx).then(() => {
+                      setVerIdx(-1);
+                      load();
+                    })
+                  }
+                >
+                  Use these notes
+                </button>
+              </div>
+            ) : showAi ? (
               <NoteEditor
                 key="ai"
                 ai
@@ -539,14 +575,7 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
           <p className="muted" style={{ marginTop: 0 }}>
             {canWrite ? "Pick one and your notes are rewritten in that shape." : "Your notes will be written in this shape after the meeting."}
           </p>
-          <div className="tpl-list" style={{ maxHeight: "50vh" }}>
-            {templates.map((t) => (
-              <button key={t.id} className={`tpl ${t.id === m.templateId ? "on" : ""}`} onClick={() => pickTemplate(t.id)}>
-                <div className="tpl-name">{t.name}</div>
-                <div className="tpl-desc">{t.description}</div>
-              </button>
-            ))}
-          </div>
+          <TemplatePicker templates={templates} current={m.templateId} onPick={pickTemplate} />
         </Modal>
       )}
 

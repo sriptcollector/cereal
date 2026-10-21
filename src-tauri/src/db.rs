@@ -38,6 +38,8 @@ pub struct Meeting {
     pub deleted_at: Option<String>,
     /// Calendar event this note belongs to (ICS UID), if any.
     pub event_id: String,
+    /// Earlier AI notes written with other templates (JSON list of {templateId, name, notes, at}).
+    pub versions: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -95,7 +97,7 @@ pub fn now() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
-const MEETING_COLS: &str = "id,title,created_at,started_at,ended_at,duration_s,app,status,step,template_id,my_notes,enhanced,folder,attendees,speaker_names,error,has_audio,updated_at,deleted_at,event_id";
+const MEETING_COLS: &str = "id,title,created_at,started_at,ended_at,duration_s,app,status,step,template_id,my_notes,enhanced,folder,attendees,speaker_names,error,has_audio,updated_at,deleted_at,event_id,versions";
 
 fn meeting_row(r: &rusqlite::Row) -> rusqlite::Result<Meeting> {
     Ok(Meeting {
@@ -119,6 +121,7 @@ fn meeting_row(r: &rusqlite::Row) -> rusqlite::Result<Meeting> {
         updated_at: r.get(17)?,
         deleted_at: r.get(18)?,
         event_id: r.get(19)?,
+        versions: r.get(20)?,
     })
 }
 
@@ -152,10 +155,14 @@ impl Db {
             "ALTER TABLE meetings ADD COLUMN deleted_at TEXT",
             "ALTER TABLE meetings ADD COLUMN event_id TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE chats ADD COLUMN thread_id TEXT",
+            "ALTER TABLE meetings ADD COLUMN versions TEXT NOT NULL DEFAULT '[]'",
         ] {
             let _ = c.execute(sql, []);
         }
         c.execute_batch(crate::library::SCHEMA)?;
+        for sql in ["ALTER TABLE folders ADD COLUMN parent_id TEXT NOT NULL DEFAULT ''", "ALTER TABLE folders ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0"] {
+            let _ = c.execute(sql, []);
+        }
         let db = Db { c: Mutex::new(c) };
         db.migrate_folder_names()?;
         Ok(db)
@@ -186,7 +193,7 @@ impl Db {
 
     /// Updates one text column (whitelisted) of a meeting.
     pub fn set(&self, id: &str, field: &str, value: &str) -> Result<()> {
-        const OK: &[&str] = &["title", "app", "status", "step", "template_id", "my_notes", "enhanced", "folder", "attendees", "speaker_names", "error", "started_at", "ended_at", "event_id"];
+        const OK: &[&str] = &["title", "app", "status", "step", "template_id", "my_notes", "enhanced", "folder", "attendees", "speaker_names", "error", "started_at", "ended_at", "event_id", "versions"];
         if !OK.contains(&field) {
             anyhow::bail!("bad field {field}");
         }

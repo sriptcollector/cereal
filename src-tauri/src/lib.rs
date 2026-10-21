@@ -488,6 +488,7 @@ pub fn run() {
             commands::sync_status,
             commands::pill_click,
             commands::still_here,
+            commands::use_version,
             commands::quick_hide,
             commands::pill_wide,
             commands::screenshot,
