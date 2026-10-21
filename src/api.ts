@@ -14,7 +14,9 @@ export interface Settings {
   language: string;
   microphone: string | null;
   capture_system: boolean;
-  detect_meetings: boolean;
+  meeting_start: "record" | "ask" | "nothing";
+  app_rules: Record<string, string>;
+  auto_consent_shown: boolean;
   auto_stop: boolean;
   consent_reminder: boolean;
   consent_message: string;
@@ -22,6 +24,17 @@ export interface Settings {
   keep_audio: "keep" | "30d" | "delete";
   launch_at_login: boolean;
   sync_enabled: boolean;
+  job_title: string;
+  about: string;
+  role: string;
+  vocabulary: string[];
+  summary_language: string;
+  calendars: CalendarSrc[];
+  calendar_popups: boolean;
+  reposition: boolean;
+  transcript_retention: string;
+  theme: "system" | "light" | "dark";
+  beta: boolean;
   model_mode: "auto" | "manual";
   speech_model: string;
   llm_model: string;
@@ -56,6 +69,98 @@ export interface Meeting {
   error: string;
   hasAudio: boolean;
   updatedAt: string;
+  deletedAt: string | null;
+  eventId: string;
+}
+
+export interface CalendarSrc {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+}
+
+export interface CalEvent {
+  id: string;
+  uid: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  attendees: string[];
+  location: string;
+  link: string;
+  calendar: string;
+  description: string;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  sort: number;
+  autoMatch: string;
+  webhook: string;
+  createdAt: string;
+  count: number;
+}
+
+export interface FileItem {
+  id: string;
+  folderId: string;
+  name: string;
+  chars: number;
+  addedAt: string;
+}
+
+export interface Thread {
+  id: string;
+  scope: string;
+  scopeId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Recipe {
+  id: string;
+  cmd: string;
+  name: string;
+  prompt: string;
+  kind: "single" | "multi";
+  builtin: boolean;
+}
+
+export interface Person {
+  key: string;
+  name: string;
+  email: string;
+  company: string;
+  meetings: number;
+  last: string;
+}
+
+export interface Company {
+  key: string;
+  name: string;
+  domain: string;
+  people: string[];
+  meetings: number;
+  last: string;
+}
+
+export interface Source {
+  n: number;
+  meetingId: string;
+  title: string;
+  date: string;
+}
+
+export interface Answer {
+  threadId: string;
+  answer: string;
+  sources: Source[];
 }
 
 export interface Segment {
@@ -146,8 +251,10 @@ export const api = {
   meeting: (id: string) => invoke<{ meeting: Meeting; segments: Segment[] }>("meeting_get", { id }),
   createMeeting: (title = "") => invoke<Meeting>("meeting_create", { title }),
   update: (id: string, field: keyof Meeting | string, value: string) => invoke<void>("meeting_update", { id, field: toSnake(field), value }),
-  deleteMeeting: (id: string) => invoke<void>("meeting_delete", { id }),
-  folders: () => invoke<string[]>("folders"),
+  trash: (id: string) => invoke<void>("meeting_trash", { id }),
+  restore: (id: string) => invoke<void>("meeting_restore", { id }),
+  purge: (id: string) => invoke<void>("meeting_purge", { id }),
+  trashList: () => invoke<Meeting[]>("trash_list"),
   renameSpeaker: (id: string, speaker: string, name: string) => invoke<void>("rename_speaker", { id, speaker, name }),
   segmentUpdate: (meetingId: string, segmentId: number, text: string) => invoke<void>("segment_update", { meetingId, segmentId, text }),
   segmentDelete: (meetingId: string, segmentId: number) => invoke<void>("segment_delete", { meetingId, segmentId }),
@@ -161,9 +268,37 @@ export const api = {
   saveTemplate: (template: Template) => invoke<Template>("template_save", { template }),
   deleteTemplate: (id: string) => invoke<void>("template_delete", { id }),
   search: (q: string) => invoke<Hit[]>("search", { q }),
-  chats: (meetingId: string | null) => invoke<ChatMsg[]>("chat_list", { meetingId }),
-  ask: (meetingId: string | null, question: string, requestId: string) => invoke<string>("chat_ask", { meetingId, question, requestId }),
-  clearChat: (meetingId: string | null) => invoke<void>("chat_clear", { meetingId }),
+  threads: (scope?: string | null, scopeId?: string | null) => invoke<Thread[]>("threads_list", { scope: scope ?? null, scopeId: scopeId ?? null }),
+  thread: (id: string) => invoke<{ thread: Thread | null; msgs: ChatMsg[]; sources: Source[] }>("thread_get", { id }),
+  deleteThread: (id: string) => invoke<void>("thread_delete", { id }),
+  chatSend: (a: { threadId: string | null; scope: string; scopeId: string; question: string; attachment?: string | null; requestId: string }) =>
+    invoke<Answer>("chat_send", { ...a, attachment: a.attachment ?? null }),
+  folders: () => invoke<Folder[]>("folders_list"),
+  saveFolder: (folder: Partial<Folder>) => invoke<Folder>("folder_save", { folder: { id: "", name: "", icon: "", description: "", sort: 0, autoMatch: "", webhook: "", createdAt: "", count: 0, ...folder } }),
+  deleteFolder: (id: string) => invoke<void>("folder_delete", { id }),
+  files: (folder: string) => invoke<FileItem[]>("files_list", { folder }),
+  addFile: (folder: string, path: string) => invoke<void>("file_add", { folder, path }),
+  deleteFile: (id: string) => invoke<void>("file_delete", { id }),
+  people: () => invoke<Person[]>("people_list"),
+  companies: () => invoke<Company[]>("companies_list"),
+  meetingsWith: (person?: string | null, domain?: string | null) => invoke<Meeting[]>("meetings_with", { person: person ?? null, domain: domain ?? null }),
+  recipes: () => invoke<Recipe[]>("recipes_list"),
+  saveRecipe: (recipe: Recipe) => invoke<Recipe>("recipe_save", { recipe }),
+  deleteRecipe: (id: string) => invoke<void>("recipe_delete", { id }),
+  events: () => invoke<CalEvent[]>("calendar_events"),
+  refreshCalendars: () => invoke<number>("calendar_refresh"),
+  noteForEvent: (eventId: string) => invoke<Meeting>("note_for_event", { eventId }),
+  briefForEvent: (eventId: string) => invoke<string>("brief_for_event", { eventId }),
+  joinEvent: (eventId: string, record: boolean) => invoke<Meeting>("join_event", { eventId, record }),
+  dock: () => invoke<void>("dock_window"),
+  dictateStart: () => invoke<void>("dictate_start"),
+  dictateStop: () => invoke<string>("dictate_stop"),
+  importAudio: (path: string) => invoke<Meeting>("import_audio", { path }),
+  exportDocx: (name: string, markdown: string) => invoke<string>("export_docx", { name, markdown }),
+  exportAll: (kind: "csv" | "json") => invoke<string>("export_all", { kind }),
+  setAppRule: (app: string, rule: string) => invoke<void>("set_app_rule", { app, rule }),
+  feedbackInfo: () => invoke<boolean>("feedback_info"),
+  feedbackSend: (kind: string, text: string, screenshot: string | null, includeDebug: boolean) => invoke<string>("feedback_send", { kind, text, screenshot, includeDebug }),
   mics: () => invoke<string[]>("list_mics"),
   audioCheck: (secs: number) => invoke<[number, number]>("audio_check", { secs }),
   models: () => invoke<ModelsInfo>("models_info"),

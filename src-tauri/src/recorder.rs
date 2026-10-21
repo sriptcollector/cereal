@@ -144,7 +144,12 @@ pub fn stop(st: &St) -> Option<String> {
             log::info!("recording stopped: {id} ({secs:.0} s) in {}", dir.display());
             // A false alarm from detection (under a minute, or nobody spoke): drop it quietly.
             if auto && prev == 0.0 {
-                let spoke = st2.db.segments(&id).map(|v| v.iter().any(|s| s.text.split_whitespace().count() >= 3)).unwrap_or(false);
+                let said = st2.db.segments(&id).map(|v| v.iter().any(|s| s.text.split_whitespace().count() >= 3)).unwrap_or(false);
+                // Live text can lag; also count real voice in the recording (8+ seconds).
+                let voiced = |f: &str| {
+                    std::fs::read(dir.join(f)).ok().and_then(|b| toolbay_engine::wav::decode(&b)).map(|a| crate::process::compact(&a).1.iter().map(|s| s.len).sum::<usize>()).unwrap_or(0)
+                };
+                let spoke = said || voiced("system.wav") + voiced("mic.wav") > 8 * 16_000;
                 let typed = st2.db.meeting(&id).ok().flatten().map(|m| !m.my_notes.trim().is_empty()).unwrap_or(false);
                 if !typed && (secs < 60.0 || !spoke) {
                     log::info!("discarded auto recording {id}: {secs:.0} s, speech: {spoke}");
@@ -261,7 +266,7 @@ async fn transcribe_live(st: &St, c: &Chunk, prompt: &str) -> Result<Vec<stt::Se
     };
     // A little silence on both ends helps whisper with the first and last word.
     let mut padded = vec![0f32; 3200];
-    padded.extend_from_slice(&c.audio);
+    padded.extend_from_slice(&wav::normalize(&c.audio));
     padded.extend(vec![0f32; 3200]);
     let bytes = wav::encode(&padded);
     let mut segs = if cloud_on && cloud.ready() {

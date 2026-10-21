@@ -5,13 +5,10 @@ const view = window.location.hash.replace("#", "");
 
 async function boot() {
   await Promise.all([
-    import("@fontsource/space-grotesk/400.css"),
-    import("@fontsource/space-grotesk/500.css"),
-    import("@fontsource/space-grotesk/600.css"),
-    import("@fontsource/space-grotesk/700.css"),
-    import("@fontsource/space-mono/400.css"),
+    import("@fontsource-variable/inter/index.css"),
+    import("@fontsource/newsreader/400.css"),
+    import("@fontsource/newsreader/500.css"),
   ]);
-  await import("./theme/toolbay-theme.css");
   await import("./app/app.css");
   const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
   if (view === "popup") {

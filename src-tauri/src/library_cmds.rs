@@ -509,3 +509,34 @@ mod tests {
         assert!(s.contains("Ship it") && s.contains("☐ Dana: send deck"));
     }
 }
+
+/// A text file the user picked in a file dialog (chat attachment), up to 2 MB.
+#[tauri::command]
+pub fn read_text_file(path: String) -> R<String> {
+    let p = PathBuf::from(&path);
+    if p.extension().map(|x| x == "docx").unwrap_or(false) {
+        return docx_text(&p).ok_or_else(|| "Couldn't read that Word file.".to_string());
+    }
+    let meta = std::fs::metadata(&p).map_err(e)?;
+    if meta.len() > 2_000_000 {
+        return Err("That file is too big to attach (2 MB max).".into());
+    }
+    std::fs::read(&p).map(|b| String::from_utf8_lossy(&b).to_string()).map_err(e)
+}
+
+/// A screenshot the user picked, as a data URL for the feedback form (max 3 MB).
+#[tauri::command]
+pub fn image_data_url(path: String) -> R<String> {
+    let p = PathBuf::from(&path);
+    let bytes = std::fs::read(&p).map_err(e)?;
+    if bytes.len() > 3_000_000 {
+        return Err("That image is over 3 MB. Try a smaller screenshot.".into());
+    }
+    let mime = match p.extension().map(|x| x.to_string_lossy().to_lowercase()).as_deref() {
+        Some("png") => "image/png",
+        Some("webp") => "image/webp",
+        _ => "image/jpeg",
+    };
+    use base64::Engine;
+    Ok(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
+}

@@ -446,6 +446,8 @@ pub fn run() {
             library_cmds::import_audio,
             library_cmds::export_docx,
             library_cmds::export_all,
+            library_cmds::read_text_file,
+            library_cmds::image_data_url,
             commands::feedback_send,
             commands::feedback_info,
         ])

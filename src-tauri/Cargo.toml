@@ -1,6 +1,6 @@
 [package]
 name = "cereal"
-version = "0.1.2"
+version = "0.2.0"
 description = "Cereal: free, local, open-source AI meeting notes. No bot joins your call."
 authors = ["Orion Jones"]
 license = "MIT"
@@ -36,6 +36,7 @@ log = "0.4"
 chrono-tz = "0.10"
 tauri-plugin-dialog = "2"
 symphonia = { version = "0.5", default-features = false, features = ["mp3", "aac", "isomp4", "wav", "flac", "vorbis", "ogg", "pcm", "adpcm"] }
+base64 = "0.22"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 keyring = { version = "3", features = ["windows-native", "apple-native"] }
 

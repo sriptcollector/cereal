@@ -1,6 +1,23 @@
 import { useState } from "react";
 import { api, Template } from "../api";
-import { Icon, Page, toast, useSettings, useTemplates } from "./ui";
+import { ReactNode } from "react";
+import { Icon, toast, useSettings, useTemplates } from "./ui";
+
+function Page({ title, sub, actions, children }: { title: string; sub: string; actions: ReactNode; children: ReactNode }) {
+  return (
+    <div className="page">
+      <div className="topbar">
+        <div className="spacer" />
+        {actions}
+      </div>
+      <div className="page-body wide" style={{ paddingTop: 0 }}>
+        <h1 className="h-serif">{title}</h1>
+        <p className="sub">{sub}</p>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 const EMPTY: Template = { id: "", name: "", description: "", sections: "Key points\nDecisions\nAction items: owner and due date", instructions: "", builtin: false, updatedAt: "" };
 
@@ -29,7 +46,7 @@ export default function Templates() {
       title="Templates"
       sub="How the AI lays out your notes. Pick one per meeting from the template button, or set a default."
       actions={
-        <button className="btn primary" onClick={() => (setSel(null), setDraft({ ...EMPTY }))}>
+        <button className="btn dark" onClick={() => (setSel(null), setDraft({ ...EMPTY }))}>
           {Icon.plus} New template
         </button>
       }
@@ -66,7 +83,7 @@ export default function Templates() {
                 <span>Extra instructions for the AI (optional)</span>
                 <textarea rows={3} value={draft.instructions} onChange={(e) => setDraft({ ...draft, instructions: e.target.value })} placeholder="Keep it short. Quote the client's exact words for requests." />
               </label>
-              <div className="actions">
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
                 {draft.id && (
                   <button
                     className="btn ghost danger"
@@ -81,13 +98,13 @@ export default function Templates() {
                     {Icon.trash} Delete
                   </button>
                 )}
-                <div className="top-spacer" />
+                <div className="spacer" />
                 {draft.id && settings?.default_template !== draft.id && (
                   <button className="btn ghost" onClick={() => save({ default_template: draft.id })}>
                     Use by default
                   </button>
                 )}
-                <button className="btn primary" onClick={store}>
+                <button className="btn dark" onClick={store}>
                   Save template
                 </button>
               </div>
@@ -112,8 +129,8 @@ export default function Templates() {
                 <p className="muted">The AI picks sections that fit the conversation, then adds decisions and action items.</p>
               )}
               {sel.instructions && <p className="muted small">{sel.instructions}</p>}
-              <div className="actions">
-                <div className="top-spacer" />
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+                <div className="spacer" />
                 {settings?.default_template !== sel.id && (
                   <button className="btn ghost" onClick={() => save({ default_template: sel.id })}>
                     Use by default

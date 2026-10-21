@@ -1,99 +1,108 @@
 # Parity checklist: Cereal vs. Granola
 
-Source: `toolbay-research/granola-report.pdf` (public information only; Granola was not installed).
-✅ done · 🟡 partly · ⬜ not yet · ➖ out of scope for v1. "Better" marks where Notes goes beyond Granola.
+Source: `toolbay-research/granola-report.pdf` (public information; Granola was not installed), and Granola's public
+press-kit screenshots (compared side by side outside this repo).
+✅ done · 🟡 partly · ⬜ not yet · ➖ out of scope (needs a hosted server, or a phone).
 
 ## Capture
 
 | # | Feature | Granola | Cereal |
 |---|---|---|---|
-| 1 | Bot-free capture, mic + system audio | Mac + Windows | ✅ WASAPI loopback (Windows, tested), ScreenCaptureKit (macOS, CI-built, untested) |
-| 2 | "Me" / "Them" labels from the two tracks | Yes | ✅ (uses your name if set) |
-| 3 | Voice diarization of the other side | No on desktop | ✅ Better: sherpa-onnx (pyannote 3.0 + CAM++), "Speaker 1, 2…" |
-| 4 | Speaker names from Zoom/Teams/Meet UI | Yes | 🟡 Rename a speaker once (applies everywhere); auto names from the call app ⬜ |
-| 5 | Microphone picker | Yes | ✅ System default or a named mic; follows default-device changes mid-call |
-| 6 | Echo handling on speakers | Mac only | ✅ Both: transcript-level echo removal |
-| 7 | Capture only the meeting app's audio | No | ⬜ (per-process loopback) |
-| 8 | Live transcript panel: bubbles, copy, search | Yes | ✅ |
-| 9 | Delete transcript lines | Yes | ✅ |
-| 10 | Edit transcript text | No | ✅ Better |
-| 11 | Pause / resume / resume later in the same note | Yes | ✅ |
-| 12 | Auto-stop (call ended, 15 min silence) | Yes | ✅ Call app releases mic (+20 s) or 15 silent minutes; sleep ⬜ |
-| 13 | Import an audio file | No | 🟡 Headless only (`--process`); UI ⬜ |
-| 14 | Keep audio for playback | Never stored | ✅ Keep / 30 days / delete after notes; in-app player ⬜ |
-| 15 | Languages | 31+ | ✅ 99 (Whisper multilingual) with a language setting; summary language follows the meeting |
-| 16 | Custom vocabulary | 30 / 50 terms | ⬜ |
-| 17 | Shared-screen snapshots | Mac only | ⬜ |
-| 18 | Works offline | No | ✅ Better: fully local |
+| 1 | Bot-free capture, mic + system audio | Mac + Windows | ✅ WASAPI loopback (Windows, tested); ScreenCaptureKit (Mac, CI-built, untested) |
+| 2 | Me / Them labels | Yes | ✅ |
+| 3 | Diarization of the other side | No on desktop | ✅ Better: Speaker 1, 2… (sherpa-onnx), rename once |
+| 4 | Speaker names from the call app | Zoom/Teams/Meet | 🟡 From calendar attendees + rename; reading names off the call window ⬜ |
+| 5 | Mic picker (Automatic) | Yes | ✅ |
+| 6 | Echo handling on speakers | Mac only | ✅ Both |
+| 7 | Capture only the meeting app | No | ⬜ |
+| 8 | Live transcript: bubbles, copy, search | Yes | ✅ |
+| 9 | Delete transcript chunks | Yes | ✅ |
+| 10 | Edit transcript | No | ✅ Better |
+| 11 | Pause / resume / resume later | Yes | ✅ |
+| 12 | Auto-stop (call ended, 15 min silence) | Yes | ✅ (+ false-alarm cleanup) |
+| 13 | Import audio | No | ✅ Better |
+| 14 | Keep audio | Never | ✅ Keep / 30 days / delete after notes; in-app player ⬜ |
+| 15 | Languages, notes language | 31+ | ✅ 99 + notes language setting |
+| 16 | Custom vocabulary | 30 / 50 terms | ✅ Unlimited (speech prompt + notes) |
+| 17 | Shared-screen snapshots | Mac | ⬜ |
+| 18 | Works offline | No | ✅ |
 
 ## Detection and calendar
 
 | # | Feature | Granola | Cereal |
 |---|---|---|---|
-| 19–20 | Calendar (Google, Microsoft, ICS) | Google + Microsoft | ⬜ (later, optional) |
-| 21 | Popup 1 minute before calendar meetings | Yes | ⬜ needs calendar |
-| 22 | Detect calls by microphone use | Yes | ✅ Windows: Zoom, Teams, Meet/Teams/Zoom/Whereby/Jitsi/Webex in the browser, Slack huddles, Discord, Webex, Skype, WhatsApp, Signal, Telegram, GoTo, RingCentral, Dialpad, Aircall. macOS: Zoom only ⬜ others |
-| 23 | Link ad-hoc call to calendar event | Yes | ⬜ needs calendar |
-| 24 | Per-app notification toggles | Yes | 🟡 Global toggle + "Not now" snoozes that app 10 min |
-| 25 | Move the window beside the call | Yes | ⬜ |
-| 26 | Floating live indicator | Yes | ✅ Pill on the screen edge, click to return |
-| 27 | Tray / menu bar | Yes | ✅ Open, Start/Stop taking notes, Settings, Quit |
-| 28 | Auto-start for all meetings | No | ⬜ (deliberately off: consent) |
+| 19 | Google + Microsoft calendar | OAuth | ✅ Private iCal link (no sign-in, local) |
+| 20 | Apple / ICS / CalDAV | No | ✅ Any iCal feed |
+| 21 | Popup 1 min before (2+ people) | Yes | ✅ Join & take notes |
+| 22 | Detect calls by mic use | Yes | ✅ Windows (incl. browser calls by tab title); Mac 14.2+ per-app |
+| 23 | Link ad-hoc call to calendar event | 15 min | ✅ |
+| 24 | Per-app notification toggles | Yes | ✅ Record / Ask / Ignore per app |
+| 25 | Move window beside the call | Yes | ✅ |
+| 26 | Floating indicator | Yes | ✅ With Pause and Stop |
+| 27 | Tray / menu bar with next meeting | Mac opt-in | ✅ Tray shows next meeting |
+| 28 | Auto-record all meetings | No | ✅ Default (Orion), never silent |
 
 ## Notes and AI
 
 | # | Feature | Granola | Cereal |
 |---|---|---|---|
-| 29 | Notepad during the meeting | Markdown, images, @mentions | 🟡 Plain-text/markdown notepad; images and @mentions ⬜ |
-| 30 | Enhance after the call | Cloud LLM | ✅ Local LLM (Qwen3 4B/1.7B) or your own key; map-reduce for long meetings |
-| 31 | Your text vs. AI text | Black / grey | ✅ White / grey (dark theme) + legend |
-| 32 | Source view per point | Magnifying glass | ⬜ |
-| 33 | Templates | ~29 + custom | ✅ 11 built-in (incl. 1:1, Sales call, Stand-up, Interview) + custom |
-| 34 | Custom template as default | No | ✅ Better |
-| 35 | Switch template / regenerate | Yes | ✅ |
-| 36 | Edit notes | Yes | ✅ Edit as Markdown; tick action items |
-| 37 | Chat: one meeting / all meetings | + folder, person, company | ✅ Meeting + all; folder/person scopes ⬜ |
-| 38 | Chat citations | Yes | 🟡 Names the meeting and date; inline citations ⬜ |
-| 39 | Voice question in chat | Yes | ⬜ (Toolbay Flow dictation works in the box) |
-| 40 | Recipes with `/` | Yes | ✅ 9 built-in; custom recipes ⬜ |
-| 41 | Model choice | Paid | ✅ Free: auto, manual, or own key |
-| 42 | Pre-meeting briefs | Paid | ⬜ |
-| 43 | Follow-up email | Paid, Gmail | ✅ `/email` recipe, copy |
-| 44–45 | Chat actions, yearly recap | Yes | ⬜ |
+| 29 | Notepad: markdown, images, @mentions | Yes | ✅ TipTap editor, paste/drop images, @people |
+| 30 | Enhance after the call | Cloud | ✅ Local (or your key); long meetings chunked |
+| 31 | Your text dark, AI text grey | Yes | ✅ |
+| 32 | Source view per point | Magnifier | ✅ Magnifier per line → transcript lines |
+| 33 | Templates | ~29 | ✅ 26 + custom |
+| 34 | Custom template as default | No | ✅ |
+| 35 | Switch template / regenerate, `/` in notes | Yes | ✅ |
+| 36 | Rewrite / edit notes | Yes | ✅ Edit inline; rewrite via chat |
+| 37 | Chat scopes | meeting, live, folder, selected, person, company, all | ✅ All of these |
+| 38 | Chat citations | Yes | ✅ Numbered, clickable |
+| 39 | Voice question | Yes | ✅ |
+| 40 | Recipes `/`, custom | Yes (+share/remix) | ✅ 12 built-in + custom; sharing ➖ |
+| 41 | Model choice | Paid | ✅ Free |
+| 42 | Pre-meeting briefs | Paid | ✅ Free, from past notes with the same people |
+| 43 | Follow-up email | Paid | ✅ Recipe + "Email the notes" |
+| 44 | Chat actions (send email/Slack/calendar) | Yes | 🟡 Email draft (mailto), Slack via folder webhook |
+| 45 | Yearly recap | Yes | ✅ `/year` recipe |
+| — | File attachments in chat | Yes | ✅ |
 
 ## Organise and share
 
 | # | Feature | Granola | Cereal |
 |---|---|---|---|
-| 46 | Home with notes by day | + Coming up | ✅ (Coming up needs calendar ⬜) |
-| 47 | Folders | Spaces + folders | 🟡 Folders (one level) |
-| 48 | Auto-file recurring meetings | Yes | ⬜ |
-| 49 | People / Companies | Yes | ⬜ |
-| 50 | Search | Yes | ✅ SQLite full-text over titles, notes and transcripts |
-| 51 | Trash with restore | 30 days | ⬜ (delete asks to confirm) |
-| 52 | Share links | Hosted | ➖ (no server by design) |
-| 53 | Copy as Markdown | Yes | ✅ Notes and transcript |
-| 54–55 | Slack / Notion / CRM / Zapier | Partly paid | ⬜ |
-| 56 | Export | CSV by email | ✅ Better: instant Markdown file and PDF |
-| 57–58 | API / MCP | Paid / limited | ⬜ |
+| 46 | Home: Coming up + notes by day | Yes | ✅ |
+| 47 | Spaces / folders | Spaces + 1 level | 🟡 My notes + folders (icons, description); nested folders ⬜ |
+| 48 | Auto-file recurring meetings | Yes | ✅ Title rule per folder |
+| 49 | People / Companies | Enriched online | ✅ From attendees (no outside data) |
+| 50 | Search | Yes | ✅ Ctrl+K full-text |
+| 51 | Trash, 30-day restore | Yes | ✅ |
+| 52 | Share links | Hosted | ➖ |
+| 53 | Copy as Markdown / email | Yes | ✅ |
+| 54–55 | Slack / Notion / CRM / Zapier, folder auto-post | Partly paid | 🟡 Slack + any webhook (Zapier/Make/n8n) per folder; Notion/HubSpot direct ⬜ |
+| 56 | Export | CSV by email, daily | ✅ Instant: MD, Word, PDF, all-notes CSV/JSON |
+| 57–58 | API / MCP | Paid | ⬜ |
+| — | Folder files as context | Yes | ✅ txt/md/csv/json/html/docx |
+| — | Multi-select notes → ask | Yes | ✅ |
 
 ## Privacy and consent
 
 | # | Feature | Granola | Cereal |
 |---|---|---|---|
-| 59 | Where audio goes | Cloud, then deleted | ✅ Never leaves the computer |
-| 60 | Auto-delete | Transcripts | 🟡 Audio retention options; transcript retention ⬜ |
-| 61 | Training on your data | On by default | ✅ Never; no telemetry at all |
-| 62 | Consent message | Auto chat message | ✅ Reminder + one-click copy of an editable message |
-| 63–64 | Camera watermark, consent page | Yes / Enterprise | ⬜ |
+| 59 | Where audio goes | Cloud | ✅ Never leaves the computer |
+| 60 | Transcript auto-delete periods | Yes | ✅ Same periods |
+| 61 | Training on your data | Opt-out | ✅ Never; no telemetry |
+| 62 | Consent message | Auto chat message | ✅ Reminder + copy message; first auto-record shows it |
+| 63–64 | Camera watermark, consent page | Yes / Enterprise | ⬜ / ➖ |
 
 ## Platform and account
 
 | # | Feature | Granola | Cereal |
 |---|---|---|---|
-| 65 | Windows + Mac | Yes | ✅ Windows tested; Mac configured and built by CI, not tested on a Mac |
+| 65 | Windows + Mac | Yes | ✅ Windows tested; Mac built + signed by CI, untested |
 | 66 | Mobile, web | Yes | ➖ |
-| 67 | Account required | Yes | ✅ Better: none; optional Toolbay sync of settings/templates |
-| 68 | Dark mode | Yes | ✅ Toolbay dark theme |
-| 69 | Updates | Auto | ✅ Signed silent updates (standalone); the hub updates hub installs |
-| 70 | Self-test | Network check | ✅ Audio test (mic + computer sound) in onboarding and Settings |
+| 67 | Account required | Yes | ✅ None; Toolbay sync optional |
+| 68 | Dark mode | Yes | ✅ Light / dark / system |
+| 69 | Updates | Auto | ✅ Signed silent updates; hub updates hub installs |
+| 70 | Self-test | Network check | ✅ Audio test |
+| — | Onboarding: role, calendar, permissions | Yes | ✅ Name, role (picks default template), calendar, audio test, auto-record choice + consent |
+| — | Profile context for notes | Yes | ✅ Name, job title, about you |
+| — | Feedback | In-app | ✅ To toolbay.ai |

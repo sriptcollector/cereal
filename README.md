@@ -2,7 +2,7 @@
 
 <h1 align="center">Cereal</h1>
 
-<p align="center"><b>Free, local, open-source AI meeting notes. No bot joins your call.</b><br>
+<p align="center"><b>The free, local AI notepad for your meetings. No bot joins your call.</b><br>
 Jot a few words during the meeting. When it ends, the AI on your computer turns them and the transcript<br>
 into clean notes with decisions and action items. No account. No limits. Nothing leaves your computer.</p>
 
@@ -11,83 +11,73 @@ Cereal is an independent open-source project and is not affiliated with or endor
 
 ---
 
-Cereal is the second free tool in the [Toolbay](https://toolbay.ai) collection: open-source rebuilds of paid
-software. It records **your microphone** ("You") and **your computer's sound** ("everyone else") as two separate
-tracks, so it works with Zoom, Google Meet, Microsoft Teams, Slack huddles, Discord, Webex or a phone app, without
-inviting anything into the call. Speech recognition ([whisper.cpp](https://github.com/ggml-org/whisper.cpp)),
-speaker separation ([sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with pyannote segmentation) and the notes
-AI ([llama.cpp](https://github.com/ggml-org/llama.cpp) with an open Qwen model) all run on your own hardware.
+Cereal (formerly Toolbay Notes) is part of [Toolbay](https://toolbay.ai): free, open-source rebuilds of paid software.
+It records **your microphone** (you) and **your computer's sound** (everyone else) as two tracks, so it works with Zoom,
+Google Meet, Microsoft Teams, Slack huddles, Discord, Webex or a phone app without inviting anything into the call.
+Speech recognition ([whisper.cpp](https://github.com/ggml-org/whisper.cpp)), speaker separation
+([sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), pyannote segmentation) and the notes AI
+([llama.cpp](https://github.com/ggml-org/llama.cpp) with an open Qwen model) all run on your own hardware.
 
-<p align="center"><img src="docs/screenshots/meeting.png" width="760" alt="Cereal meeting page with AI notes and transcript"></p>
+<p align="center"><img src="docs/screenshots/home.png" width="760" alt="Cereal home: Coming up and notes"></p>
+<p align="center"><img src="docs/screenshots/meeting.png" width="760" alt="Cereal note with enhanced notes"></p>
 
 Written from scratch (Tauri 2 + Rust + React). No code, assets or services from any commercial product are used.
 
 ## Install
 
 **Windows 10/11:** download `Cereal_x.y.z_x64-setup.exe` from [Releases](https://github.com/sriptcollector/cereal/releases/latest)
-and double-click it. No admin prompt and nothing else to install: the speech, speaker and notes engines and a starter
-speech model are inside the installer. Notes picks the best AI models for your computer by itself and fetches them in
-the background (a gaming GPU gets Whisper Large v3 Turbo and Qwen3 4B; an ordinary laptop gets compact models).
+and double-click it. No admin prompt, nothing else to install: the speech, speaker and notes engines and a starter speech
+model are inside. Cereal picks the best AI models for your computer and fetches them in the background.
 
-**macOS 13+ (Apple Silicon or Intel):** download the `.dmg` from Releases. Allow Microphone and "Screen & System
-Audio Recording" when asked (Notes only uses the sound, never your screen). The Mac build is produced by CI and
-has not been tested on a real Mac yet.
+**macOS 13+:** download the `.dmg`. Allow Microphone and "Screen & System Audio Recording" when asked (only the sound is
+used, never your screen). Built and signed by CI; not yet tested on a real Mac.
 
-**Through the Toolbay app:** open Toolbay, find *Notes*, click Install. Toolbay reads [`toolbay.json`](toolbay.json),
-installs Notes and its notes AI model in one step, and opens it.
+**Through the Toolbay app:** find *Cereal* and click Install. One step, models included.
 
 ## How it works
 
-1. A call starts (any app that uses your microphone). A small popup asks **Take notes?** Nothing records until you click.
-   Or click **New note** yourself.
-2. Cereal reminds you to tell the others and gives you a message to paste in the meeting chat
-   (in many places everyone must agree to be recorded).
-3. Type rough notes as the call goes. The live transcript fills in on the right: **You**, and the other side.
-4. When the call ends (Notes stops by itself 20 s after the call app releases the microphone), it re-transcribes the
-   whole call at full quality, tells the other speakers apart (Speaker 1, 2, …; click to name them), removes the echo
-   of the other side from your mic if you used speakers, and writes your notes with the template you picked.
-   Your own points show in white, what the AI added in grey.
-5. Ask questions about one meeting or all of them (`Ctrl+J`), search everything (`Ctrl+K`), copy as Markdown,
-   save as a Markdown file or PDF.
+1. A call starts. Cereal notices (Zoom, Meet, Teams, Slack, Discord, Webex, browser calls…) and starts taking notes,
+   with a small floating indicator (Pause, Stop). Prefer to be asked? Settings › When a meeting starts.
+   With a calendar connected, you also get a nudge a minute before each meeting.
+2. The first time, it reminds you to tell the others (in many places everyone must agree to be recorded) and gives you
+   a message to paste in the chat.
+3. Type rough notes as the call goes. The live transcript fills in on the right.
+4. When the call ends, Cereal stops by itself, re-transcribes at full quality, tells the other speakers apart, removes
+   echo, and writes your notes with your template. Your own points stay dark; what the AI added is grey. Click the
+   magnifier next to any line to see where it came from in the transcript.
+5. Chat with one meeting, a folder, a person, a company, selected notes or everything (Ctrl+J), with sources. Search
+   everything (Ctrl+K). Share as Markdown, Word, PDF or email, or auto-post a folder to Slack or any webhook.
 
-Measured on a desktop with an RTX 4070 Ti (12 GB) and 32 threads, for a **44-minute, 4-person meeting**:
-final transcript with speakers **45 s** after the call, notes **21 s** later: about **66 s** in total.
-Without a GPU (same PC, CPU only, small speech model + Qwen3 4B) the transcript is written live during the call and the
-notes take about **9 minutes** after a 44-minute meeting; a typical laptop is slower.
+Short calls with no talking are thrown away automatically.
+
+**Speed** (RTX 4070 Ti, 44-minute 4-person meeting): transcript and speakers ready ~60 s after the call, notes ~22 s
+later. CPU only (same PC): transcript written live during the call, notes ~9 minutes after.
 
 ## Features
 
-- **Two-track capture, no bot:** microphone + system audio (WASAPI loopback on Windows, ScreenCaptureKit on macOS),
-  kept on one clock, follows device changes (plug in headphones mid-call), never mutes or ducks other audio.
-- **Live transcript** while you talk (chunks cut at natural pauses), then a **full-quality pass** after the call.
-- **Speaker separation:** "You" vs. the other side from the two tracks, plus local diarization of the other people;
-  rename speakers once, everywhere.
-- **Echo removal** for people without headphones.
-- **AI notes from your notes:** keeps every point you typed, adds the rest from the transcript, never invents names or
-  numbers. Long meetings are condensed part by part first, so a small local model handles 2-hour calls.
-- **Templates:** Auto, 1:1, Sales call, Stand-up, Interview, Team meeting, User interview, Project kick-off,
-  Investor pitch, Brainstorm, Lecture, plus your own. Switch and rewrite any time.
-- **Chat with your notes** for one meeting or across all, with `/` recipes (TL;DR, action items by owner,
-  follow-up email, decisions, "what did I miss?", my week, my open to-dos).
-- **Search** across titles, notes and transcripts (SQLite full-text).
-- **Export:** copy notes or transcript, Markdown file, PDF.
-- **Meeting detection** for Zoom, Teams, Google Meet (and other browser calls), Slack huddles, Discord, Webex, Skype,
-  WhatsApp and more; auto-stop when the call ends or after 15 silent minutes.
-- **Consent:** reminder each time recording starts, editable "let others know" message.
-- **Folders**, a tray icon, a small floating pill while recording, resume recording into the same note.
-- **Automatic model choice** for your hardware; optional cloud engines with your own key (OpenAI-compatible speech,
-  OpenAI-compatible or Anthropic notes).
-- **Toolbay account sync** for settings and custom templates only. Recordings, transcripts and notes stay local.
-- No telemetry, no analytics, no account required.
+- Two-track capture, no bot; live transcript; full-quality pass after the call; speaker separation; echo removal;
+  auto-gain for quiet calls; follows device changes; never mutes other audio.
+- Auto-detect and auto-record meetings (or ask, or do nothing), per-app rules and "ignore this app", auto-stop,
+  false-alarm cleanup, always-visible indicator.
+- Calendar via your private iCal link (Google, Outlook, iCloud): Coming up, pre-meeting nudge, prep briefs from past
+  notes with the same people, notes titled with the event and its attendees.
+- Granola-style notepad: Markdown, checkboxes, images (paste or drop), @mentions, `/` for templates.
+- 26 templates (1:1, Sales call, Discovery, Stand-up, Interview, Retro, Board meeting…) plus your own, any as default.
+- Chat with scopes and numbered citations, `/` recipes (12 built-in plus your own), voice questions, file attachments.
+- Spaces: My notes and folders with icons, descriptions, files as chat context, auto-filing and webhooks; People and
+  Companies views; Trash with 30-day restore.
+- Import audio files (MP3, M4A, WAV, FLAC…) as notes. Export one note (Markdown, Word, PDF) or everything (CSV, JSON).
+- Vocabulary, profile and notes language; transcript retention; light and dark; Toolbay account sync; in-app feedback.
+- Automatic model choice; optional cloud engines with your own key. No telemetry.
 
 The full checklist against Granola is in [docs/FEATURES.md](docs/FEATURES.md).
 
 ## Privacy
 
-Everything is stored in your app data folder (`%APPDATA%\ai.toolbay.cereal` on Windows,
-`~/Library/Application Support/ai.toolbay.cereal` on Mac): audio, transcripts, notes and the search index. The only
-network use is downloading AI models (Hugging Face, GitHub), Toolbay sync of settings/templates when you're signed in
-to the Toolbay app, and a cloud engine only if you add your own API key.
+Audio, transcripts, notes and the search index live in your app data folder (`%APPDATA%\ai.toolbay.cereal` on Windows,
+`~/Library/Application Support/ai.toolbay.cereal` on Mac). Network use: downloading AI models, your calendar feed,
+Toolbay sync of settings/templates when signed in to the Toolbay app, feedback you choose to send, webhooks you set, and
+a cloud engine only if you add your own key.
 
 ## Build from source
 
@@ -96,10 +86,9 @@ npm install
 npm run tauri dev
 ```
 
-`npm run tauri build` makes the installer (it downloads the bundled engines and models first). Tests:
-`cargo test --workspace`. See [AGENTS.md](AGENTS.md) for the code map and headless test modes.
+`npm run tauri build` makes the installer. Tests: `cargo test --workspace`. See [AGENTS.md](AGENTS.md).
 
 ## License
 
-MIT. whisper.cpp, llama.cpp and sherpa-onnx are MIT/Apache-2.0; Whisper models (MIT), Qwen3 (Apache-2.0),
-pyannote segmentation 3.0 (MIT), 3D-Speaker CAM++ (Apache-2.0).
+MIT. whisper.cpp, llama.cpp and sherpa-onnx are MIT/Apache-2.0; Whisper models (MIT), Qwen3 (Apache-2.0), pyannote
+segmentation 3.0 (MIT), 3D-Speaker CAM++ (Apache-2.0). Fonts: Newsreader and Inter (OFL).

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, Meeting, on, RecState, Segment, Settings } from "../api";
-import type { Route } from "./App";
-import { copy, dayLabel, Icon, Menu, timeOf, toast, useSettings, useTemplates } from "./ui";
-import { fmtDur, fmtMinutes, Markdown, toggleCheck } from "./md";
-import ChatBar, { Thread, useChat } from "./ChatBar";
+import { api, Meeting, on, RecState, Segment, Settings, Source } from "../api";
+import type { Go } from "./App";
+import { copy, dayLabel, Icon, Menu, Modal, timeOf, toast, useFolders, useSettings, useTemplates } from "./ui";
+import { fmtDur, fmtMinutes, Markdown } from "./md";
+import AskBar, { Thread, useThread } from "./ChatBar";
+import NoteEditor from "./Editor";
 
 function useDebounced<T>(fn: (v: T) => void, ms: number) {
   const t = useRef<number | undefined>(undefined);
@@ -18,44 +19,45 @@ function useDebounced<T>(fn: (v: T) => void, ms: number) {
   );
 }
 
-function speakerName(m: Meeting | null, s: string) {
+function namesMap(m: Meeting | null): Record<string, string> {
   try {
-    const map = JSON.parse(m?.speakerNames || "{}");
-    return map[s] || s;
+    return JSON.parse(m?.speakerNames || "{}");
   } catch {
-    return s;
+    return {};
   }
 }
 
 export function notesMarkdown(m: Meeting, segs: Segment[], withTranscript: boolean) {
+  const names = namesMap(m);
   const title = m.title || "Meeting notes";
-  let md = `# ${title}\n\n_${dayLabel(m.createdAt)}, ${timeOf(m.createdAt)}${m.durationS ? ` · ${fmtMinutes(m.durationS)}` : ""}${m.app ? ` · ${m.app}` : ""}_\n\n`;
+  let md = `# ${title}\n\n_${dayLabel(m.createdAt)}, ${timeOf(m.createdAt)}${m.durationS ? ` · ${fmtMinutes(m.durationS)}` : ""}${m.attendees ? ` · ${m.attendees}` : ""}_\n\n`;
   md += (m.enhanced || m.myNotes || "").trim() + "\n";
   if (withTranscript && segs.length) {
     md += `\n## Transcript\n\n`;
-    for (const s of segs) md += `**${speakerName(m, s.speaker)}** (${fmtDur(s.start)}): ${s.text}\n\n`;
+    for (const s of segs) md += `**${names[s.speaker] || s.speaker}** (${fmtDur(s.start)}): ${s.text}\n\n`;
   }
   return md;
 }
 
-export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Route) => void; panel?: string }) {
+export default function MeetingPage({ id, go, panel }: { id: string; go: Go; panel?: string }) {
   const [m, setM] = useState<Meeting | null>(null);
   const [segs, setSegs] = useState<Segment[]>([]);
   const [rec, setRec] = useState<RecState | null>(null);
   const [settings] = useSettings();
   const [templates] = useTemplates();
+  const [folders] = useFolders();
   const [view, setView] = useState<"ai" | "mine">("mine");
-  const [editAi, setEditAi] = useState(false);
   const [showTx, setShowTx] = useState(panel === "transcript");
   const [chatOpen, setChatOpen] = useState(false);
   const [streamNotes, setStreamNotes] = useState("");
   const [consentOpen, setConsentOpen] = useState(false);
   const [myNotes, setMyNotes] = useState("");
   const [title, setTitle] = useState("");
-  const [aiDraft, setAiDraft] = useState("");
-  const [folderEdit, setFolderEdit] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const chat = useChat(id);
+  const [people, setPeople] = useState<string[]>([]);
+  const [attEdit, setAttEdit] = useState(false);
+  const [tplPick, setTplPick] = useState(false);
+  const [brief, setBrief] = useState<string | null>(null);
+  const thread = useThread("meeting", id);
   const loaded = useRef(false);
 
   const load = useCallback(async () => {
@@ -67,10 +69,8 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Rou
         loaded.current = true;
         setMyNotes(r.meeting.myNotes);
         setTitle(r.meeting.title);
-        setAiDraft(r.meeting.enhanced);
         setView(r.meeting.enhanced ? "ai" : "mine");
       }
-      return r.meeting;
     } catch {
       go({ page: "home" });
     }
@@ -79,17 +79,13 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Rou
   useEffect(() => {
     load();
     api.recState().then(setRec);
+    api.people().then((p) => setPeople(p.map((x) => x.name).filter(Boolean)));
+    api.threads("meeting", id).then((t) => t[0] && thread.setThreadId(t[0].id));
     const u1 = on<Meeting>("meeting-updated", (x) => {
       if (x.id !== id) return;
       setM((prev) => {
-        if (prev && !prev.enhanced && x.enhanced) {
-          setView("ai");
-          setAiDraft(x.enhanced);
-          setStreamNotes("");
-        } else if (prev && x.enhanced !== prev.enhanced) {
-          setAiDraft(x.enhanced);
-          setStreamNotes("");
-        }
+        if (prev && !prev.enhanced && x.enhanced) setView("ai");
+        if (prev && x.enhanced !== prev.enhanced) setStreamNotes("");
         if (prev && !prev.title && x.title) setTitle(x.title);
         return x;
       });
@@ -102,19 +98,21 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Rou
     const u4 = on<{ meetingId: string; text: string }>("notes-token", (e) => {
       if (e.meetingId === id) setStreamNotes((s) => s + e.text);
     });
+    const u5 = on<string>("meeting-deleted", (d) => d === id && go({ page: "home" }));
     return () => {
       u1();
       u2();
       u3();
       u4();
+      u5();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, load]);
 
   const recordingThis = rec?.meetingId === id;
   const recordingOther = !!rec?.meetingId && !recordingThis;
   const paused = !!rec?.levels?.paused;
 
-  // Consent reminder each time recording starts on this note.
   const wasRecording = useRef(false);
   useEffect(() => {
     if (recordingThis && !wasRecording.current && settings?.consent_reminder) setConsentOpen(true);
@@ -123,10 +121,14 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Rou
 
   const saveNotes = useDebounced<string>((v) => api.update(id, "myNotes", v), 400);
   const saveTitle = useDebounced<string>((v) => api.update(id, "title", v), 400);
-  const saveAi = useDebounced<string>((v) => api.update(id, "enhanced", v), 500);
+  const saveAi = useDebounced<string>((v) => api.update(id, "enhanced", v), 600);
 
-  const tplName = useMemo(() => templates.find((t) => t.id === (m?.templateId || "auto"))?.name ?? "Auto", [templates, m?.templateId]);
+  const names = useMemo(() => namesMap(m), [m]);
+  const speakerName = (s: string) => names[s] || s;
+  const tplName = templates.find((t) => t.id === (m?.templateId || "auto"))?.name ?? "Auto";
+  const attendees = (m?.attendees ?? "").split(/[,;\n]/).map((a) => a.trim()).filter(Boolean);
   const speakers = useMemo(() => Array.from(new Set(segs.map((s) => s.speaker))), [segs]);
+  const folder = folders.find((f) => f.id === m?.folder);
 
   if (!m || !settings) return <div className="page" />;
 
@@ -140,15 +142,15 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Rou
       toast(String(e));
     }
   };
-  const stop = async () => {
-    await api.recordStop();
-    setStreamNotes("");
-  };
   const regenerate = async (tid?: string) => {
     setStreamNotes("");
-    setEditAi(false);
     setView("ai");
     await api.regenerate(id, tid ?? m.templateId);
+  };
+  const pickTemplate = (tid: string) => {
+    setTplPick(false);
+    if (canWrite) regenerate(tid);
+    else api.update(id, "templateId", tid).then(load);
   };
   const print = () => {
     const prev = document.title;
@@ -156,97 +158,107 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Rou
     window.print();
     document.title = prev;
   };
-  const exportMd = async () => {
-    const p = await api.exportMarkdown(m.title || "Meeting notes", notesMarkdown(m, segs, true));
-    toast(`Saved to ${p}`);
+  const exportMd = async () => toast(`Saved to ${await api.exportMarkdown(m.title || "Meeting notes", notesMarkdown(m, segs, true))}`);
+  const exportDocx = async () => toast(`Saved to ${await api.exportDocx(m.title || "Meeting notes", notesMarkdown(m, segs, false))}`);
+  const emailDraft = () => {
+    const to = attendees.map((a) => /<([^>]+)>/.exec(a)?.[1] ?? (a.includes("@") ? a : "")).filter(Boolean).join(",");
+    const body = notesMarkdown(m, segs, false).replace(/^# .*\n+/, "");
+    window.open(`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent("Notes: " + (m.title || "our meeting"))}&body=${encodeURIComponent(body.slice(0, 1800))}`);
+  };
+  const openSource = (s: Source) => s.meetingId !== id && go({ page: "meeting", id: s.meetingId });
+  const loadBrief = async () => {
+    if (!m.eventId) return;
+    setBrief("");
+    try {
+      setBrief((await api.briefForEvent(m.eventId)) || "No past notes with these people yet.");
+    } catch (e) {
+      setBrief(String(e));
+    }
   };
 
   const aiText = streamNotes ? streamNotes.replace(/^\s*Title:.*\n?/i, "") : m.enhanced;
+  const showAi = view === "ai" && (m.enhanced || streamNotes);
 
   return (
     <div className={`meeting ${showTx ? "with-tx" : ""}`}>
       <div className="meeting-main">
-        <div className="meeting-top">
-          <button className="icon-btn" onClick={() => go({ page: "home" })} aria-label="Back">
-            {Icon.back}
-          </button>
-          <div className="top-spacer" />
-          {m.enhanced || processing ? (
-            <div className="seg-toggle">
-              <button className={view === "mine" ? "on" : ""} onClick={() => setView("mine")} title="Your own notes">
-                My notes
-              </button>
-              <button className={view === "ai" ? "on" : ""} onClick={() => setView("ai")} title="Notes written by the AI">
-                {Icon.sparkle} AI notes
-              </button>
-            </div>
-          ) : null}
-          <Menu
-            label={
-              <>
-                {Icon.layout} {tplName}
-              </>
-            }
-          >
-            {(close) => (
-              <>
-                <div className="menu-label">Write notes with a template</div>
-                {templates.map((t) => (
-                  <button
-                    key={t.id}
-                    className={t.id === m.templateId ? "on" : ""}
-                    onClick={() => {
-                      close();
-                      if (canWrite) regenerate(t.id);
-                      else api.update(id, "templateId", t.id).then(load);
-                    }}
-                  >
-                    <span>{t.name}</span>
-                    <small>{t.description}</small>
+        <div className="topbar">
+          <div className="crumb">
+            <button onClick={() => go({ page: "home" })} title="Back">
+              {Icon.back}
+            </button>
+            <button onClick={() => (folder ? go({ page: "folder", id: folder.id }) : go({ page: "home" }))} title={folder ? folder.name : "Home"}>
+              {folder ? <span style={{ fontSize: 12 }}>{folder.icon || "📁"}</span> : Icon.home}
+            </button>
+          </div>
+          <div className="spacer" />
+          {(m.enhanced || processing) && (
+            <Menu
+              label={
+                <>
+                  {view === "ai" ? Icon.sparkle : Icon.doc} {view === "ai" ? "Enhanced notes" : "My notes"} {Icon.chevron}
+                </>
+              }
+            >
+              {(close) => (
+                <>
+                  <button className={view === "ai" ? "on" : ""} onClick={() => (setView("ai"), close())}>
+                    {Icon.sparkle} Enhanced notes
                   </button>
-                ))}
-              </>
-            )}
-          </Menu>
-          <Menu
-            label={
-              <>
-                {Icon.share} Share
-              </>
-            }
-          >
+                  <button className={view === "mine" ? "on" : ""} onClick={() => (setView("mine"), close())}>
+                    {Icon.doc} My notes
+                  </button>
+                </>
+              )}
+            </Menu>
+          )}
+          <button className="btn ghost" onClick={() => setTplPick(true)} title="Template">
+            {Icon.layout} {tplName}
+          </button>
+          {m.enhanced && !processing && (
+            <button className="icon-btn" onClick={() => regenerate()} title="Rewrite notes with this template" disabled={!canWrite}>
+              {Icon.retry}
+            </button>
+          )}
+          <Menu btnClass="btn dark" label="Share">
             {(close) => (
               <>
-                <button onClick={() => (close(), copy(notesMarkdown(m, segs, false), "Notes copied as Markdown"))}>Copy notes</button>
-                <button onClick={() => (close(), copy(segs.map((s) => `${speakerName(m, s.speaker)}: ${s.text}`).join("\n"), "Transcript copied"))} disabled={!segs.length}>
-                  Copy transcript
+                <button onClick={() => (close(), copy(notesMarkdown(m, segs, false), "Notes copied as Markdown"))}>{Icon.copy} Copy notes</button>
+                <button onClick={() => (close(), copy(segs.map((s) => `${speakerName(s.speaker)}: ${s.text}`).join("\n"), "Transcript copied"))} disabled={!segs.length}>
+                  {Icon.transcript} Copy transcript
                 </button>
-                <button onClick={() => (close(), exportMd())}>Save as Markdown file</button>
-                <button onClick={() => (close(), print())}>Save as PDF…</button>
+                <button onClick={() => (close(), emailDraft())}>{Icon.share} Email the notes</button>
                 <div className="menu-sep" />
-                <button onClick={() => (close(), copy(settings.consent_message, "Message copied: paste it in the meeting chat"))}>Copy “let others know” message</button>
+                <button onClick={() => (close(), exportMd())}>{Icon.doc} Save as Markdown</button>
+                <button onClick={() => (close(), exportDocx())}>{Icon.doc} Save as Word</button>
+                <button onClick={() => (close(), print())}>{Icon.doc} Save as PDF…</button>
+                <div className="menu-sep" />
+                <button onClick={() => (close(), copy(settings.consent_message, "Paste it in the meeting chat"))}>{Icon.shield} Copy “let others know” message</button>
               </>
             )}
           </Menu>
-          <Menu label={Icon.more}>
+          <button className="icon-btn dark" title="Copy notes" onClick={() => copy(notesMarkdown(m, segs, false), "Notes copied")}>
+            {Icon.link}
+          </button>
+          <Menu label={Icon.more} btnClass="icon-btn">
             {(close) => (
               <>
-                <button onClick={() => (close(), setFolderEdit(m.folder))}>{m.folder ? `Folder: ${m.folder}` : "Add to folder…"}</button>
                 {m.hasAudio && (
                   <button onClick={() => (close(), api.reprocess(id))} disabled={recordingThis || processing}>
-                    Redo transcript and notes
+                    {Icon.retry} Redo transcript and notes
                   </button>
                 )}
-                {m.hasAudio && <button onClick={() => (close(), api.revealAudio(id))}>Show recording files</button>}
+                {m.hasAudio && <button onClick={() => (close(), api.revealAudio(id))}>{Icon.folder} Show recording files</button>}
+                <button onClick={() => (close(), api.dock())}>{Icon.sidebar} Move beside the call</button>
                 <div className="menu-sep" />
-                <button className="danger" onClick={() => (close(), setConfirmDelete(true))}>
-                  Delete note
+                <button className="danger" onClick={() => (close(), api.trash(id).then(() => (toast("Moved to trash"), go({ page: "home" }))))}>
+                  {Icon.trash} Move to trash
                 </button>
               </>
             )}
           </Menu>
-          <button className={`btn ghost ${showTx ? "pressed" : ""}`} onClick={() => setShowTx(!showTx)} title="Transcript">
-            {Icon.transcript} Transcript
+          <button className={`icon-btn ${showTx ? "dark" : ""}`} onClick={() => setShowTx(!showTx)} title="Transcript">
+            {Icon.transcript}
           </button>
         </div>
 
@@ -270,99 +282,111 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Rou
               }}
             />
             <div className="meta">
-              <span>{dayLabel(m.createdAt)}</span>
-              <span>{timeOf(m.createdAt)}</span>
-              {m.durationS > 0 && <span>{fmtMinutes(m.durationS)}</span>}
-              {m.app && <span>{m.app}</span>}
-              {speakers.length > 0 && <span>{speakers.map((s) => speakerName(m, s)).join(", ")}</span>}
-              {m.folder && <span className="chip">{m.folder}</span>}
+              <span className="pill">
+                {Icon.calendar} {dayLabel(m.createdAt)} {timeOf(m.createdAt)}
+                {m.durationS > 0 ? ` · ${fmtMinutes(m.durationS)}` : ""}
+              </span>
+              <button className="pill" onClick={() => setAttEdit(true)}>
+                {Icon.people} {attendees.length ? `${attendees.length} attendee${attendees.length > 1 ? "s" : ""}` : speakers.length > 1 ? `${speakers.length} speakers` : "Add attendees"}
+              </button>
+              <Menu
+                btnClass="pill"
+                align="left"
+                label={
+                  <>
+                    {Icon.folder} {folder ? `${folder.icon} ${folder.name}` : "Select folder"} {Icon.chevron}
+                  </>
+                }
+              >
+                {(close) => (
+                  <>
+                    {folders.map((f) => (
+                      <button key={f.id} className={f.id === m.folder ? "on" : ""} onClick={() => (close(), api.update(id, "folder", f.id).then(load))}>
+                        <span>{f.icon || "📁"}</span> {f.name}
+                      </button>
+                    ))}
+                    {m.folder && <button onClick={() => (close(), api.update(id, "folder", "").then(load))}>{Icon.lock} My notes (no folder)</button>}
+                    <div className="menu-sep" />
+                    <button
+                      onClick={async () => {
+                        close();
+                        const f = await api.saveFolder({ name: "New folder", icon: "📁" });
+                        await api.update(id, "folder", f.id);
+                        load();
+                      }}
+                    >
+                      {Icon.plus} New folder
+                    </button>
+                  </>
+                )}
+              </Menu>
+              {m.app && <span className="pill">{m.app}</span>}
             </div>
 
-            {folderEdit !== null && (
-              <div className="inline-form">
-                <input autoFocus placeholder="Folder name, e.g. Clients" value={folderEdit} onChange={(e) => setFolderEdit(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (api.update(id, "folder", folderEdit.trim()).then(load), setFolderEdit(null))} />
-                <button className="btn primary" onClick={() => (api.update(id, "folder", folderEdit.trim()).then(load), setFolderEdit(null))}>
-                  Save
-                </button>
-                <button className="btn ghost" onClick={() => setFolderEdit(null)}>
-                  Cancel
-                </button>
-              </div>
-            )}
-            {confirmDelete && (
-              <div className="banner bad">
-                <span>Delete this note, its transcript and recording? This can't be undone.</span>
-                <button className="btn danger" onClick={() => api.deleteMeeting(id).then(() => go({ page: "home" }))}>
-                  Delete
-                </button>
-                <button className="btn ghost" onClick={() => setConfirmDelete(false)}>
-                  Cancel
-                </button>
+            {m.eventId && !m.enhanced && segs.length === 0 && (
+              <div className="brief">
+                <div className="brief-title">Before you join</div>
+                {brief === null ? (
+                  <button className="btn" onClick={loadBrief}>
+                    {Icon.sparkle} Prep me from past notes with these people
+                  </button>
+                ) : brief === "" ? (
+                  <span className="thinking">Reading your past notes…</span>
+                ) : (
+                  <Markdown md={brief} />
+                )}
               </div>
             )}
             {consentOpen && recordingThis && <Consent settings={settings} onClose={() => setConsentOpen(false)} />}
             {processing && (
               <div className="banner work">
                 <span className="spinner" />
-                <span>{m.step || "Working on your notes…"}</span>
+                <span className="t">{m.step || "Writing your notes…"}</span>
               </div>
             )}
             {m.status === "failed" && m.error && (
               <div className="banner bad">
-                <span>{m.error}</span>
+                <span className="t">{m.error}</span>
                 <button className="btn" onClick={() => regenerate()}>
                   Write notes
                 </button>
               </div>
             )}
 
-            {view === "mine" || (!m.enhanced && !streamNotes) ? (
-              <textarea
-                className="notepad"
-                placeholder={
-                  recordingThis
-                    ? "Write rough notes here as the meeting goes. A few words are enough: the AI fills in the rest from the transcript when the call ends."
-                    : "Write notes here. Click Start recording when the meeting begins."
-                }
-                value={myNotes}
-                onChange={(e) => (setMyNotes(e.target.value), saveNotes(e.target.value))}
-                autoFocus={!m.enhanced}
+            {showAi ? (
+              <NoteEditor
+                key="ai"
+                ai
+                markdown={aiText}
+                myNotes={myNotes}
+                editable={!processing}
+                onChange={(md) => saveAi(md)}
+                placeholder=""
+                people={people}
+                segments={segs}
+                speakerName={speakerName}
               />
-            ) : editAi ? (
-              <textarea className="notepad ai-edit" value={aiDraft} onChange={(e) => (setAiDraft(e.target.value), saveAi(e.target.value))} autoFocus />
             ) : (
-              <div className="ai-notes" onDoubleClick={() => !processing && (setAiDraft(m.enhanced), setEditAi(true))}>
-                <Markdown
-                  md={aiText}
-                  myNotes={myNotes}
-                  onToggle={(line, done) => {
-                    const next = toggleCheck(m.enhanced, line, done);
-                    api.update(id, "enhanced", next);
-                    setM({ ...m, enhanced: next });
-                  }}
-                />
-                {processing && streamNotes && <span className="caret" />}
-              </div>
+              <NoteEditor
+                key="mine"
+                markdown={myNotes}
+                onChange={(md) => (setMyNotes(md), saveNotes(md))}
+                placeholder={recordingThis ? "Write notes… A few words are enough. Type / for a template." : "Write notes, or press the record button when the meeting starts."}
+                people={people}
+                autoFocus={!m.enhanced}
+                onTemplateSlash={() => setTplPick(true)}
+              />
             )}
-            {view === "ai" && m.enhanced && !processing && (
-              <div className="ai-tools">
-                <span className="legend">
-                  <i className="mine" /> From your notes <i className="ai" /> Added by AI
+            {showAi && myNotes.trim() && !processing && (
+              <div className="ai-legend">
+                <span>
+                  <i className="mine" />
+                  From your notes
                 </span>
-                <button className="btn ghost small" onClick={() => (editAi ? setEditAi(false) : (setAiDraft(m.enhanced), setEditAi(true)))}>
-                  {editAi ? (
-                    <>
-                      {Icon.check} Done
-                    </>
-                  ) : (
-                    <>
-                      {Icon.edit} Edit
-                    </>
-                  )}
-                </button>
-                <button className="btn ghost small" onClick={() => regenerate()} disabled={!canWrite}>
-                  {Icon.retry} Rewrite
-                </button>
+                <span>
+                  <i className="ai" />
+                  Added by Cereal
+                </span>
               </div>
             )}
           </div>
@@ -372,75 +396,108 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Rou
           <div className="chat-panel">
             <div className="chat-panel-head">
               <span>Ask about this meeting</span>
-              <div>
-                {chat.msgs.length > 0 && (
-                  <button className="btn ghost small" onClick={chat.clear}>
-                    Clear
-                  </button>
-                )}
-                <button className="icon-btn" onClick={() => setChatOpen(false)} aria-label="Close">
-                  {Icon.close}
+              <div className="spacer" />
+              {thread.msgs.length > 0 && (
+                <button className="btn ghost" onClick={() => thread.reset()}>
+                  New chat
                 </button>
-              </div>
+              )}
+              <button className="icon-btn" onClick={() => setChatOpen(false)} aria-label="Close">
+                {Icon.close}
+              </button>
             </div>
-            <Thread chat={chat} />
+            <Thread t={thread} onSource={openSource} />
           </div>
         )}
 
         <div className="dock">
-          {recordingThis ? (
-            <div className="recbar">
-              <span className={`rec-dot ${paused ? "paused" : ""}`} />
-              <span className="mono time">{fmtDur(rec?.levels?.secs ?? 0)}</span>
-              <Meter label="You" v={rec?.levels?.mic ?? 0} off={paused} />
-              <Meter label="Them" v={rec?.levels?.system ?? 0} off={paused || !settings.capture_system} />
-              {rec?.levels?.system_error && <span className="warn-text" title={rec.levels.system_error}>Computer sound unavailable</span>}
-              <div className="top-spacer" />
-              <button className="btn ghost" onClick={() => api.recordPause(!paused)}>
-                {paused ? Icon.play : Icon.pause} {paused ? "Resume" : "Pause"}
-              </button>
-              <button className="btn primary" onClick={stop}>
-                {Icon.stop} Stop & write notes
-              </button>
-            </div>
-          ) : (
-            <div className="recbar idle">
-              {processing ? (
-                <span className="muted">{m.step || "Working…"}</span>
-              ) : (
-                <>
-                  <button className="btn ghost" onClick={start} disabled={recordingOther} title={recordingOther ? "Another meeting is being recorded" : ""}>
-                    {Icon.mic} {m.hasAudio ? "Resume recording" : "Start recording"}
-                  </button>
-                  {!m.enhanced && canWrite && (
-                    <button className="btn primary" onClick={() => regenerate()}>
-                      {Icon.sparkle} Write notes
-                    </button>
+          <div className="dock-row">
+            {recordingThis ? (
+              <div className="recctl">
+                <Menu
+                  up
+                  align="left"
+                  btnClass=""
+                  label={
+                    <>
+                      <Bars v={Math.max(rec?.levels?.mic ?? 0, rec?.levels?.system ?? 0)} off={paused} />
+                      {Icon.chevron}
+                    </>
+                  }
+                >
+                  {(close) => (
+                    <>
+                      <div className="menu-label">
+                        You {Math.round((rec?.levels?.mic ?? 0) * 100)}% · Them {Math.round((rec?.levels?.system ?? 0) * 100)}%
+                      </div>
+                      {rec?.levels?.mic_device && <div className="menu-label">Mic: {rec.levels.mic_device}</div>}
+                      {rec?.levels?.system_error && <div className="menu-label" style={{ color: "var(--warn)" }}>{rec.levels.system_error}</div>}
+                      <button onClick={() => (close(), api.recordPause(!paused))}>
+                        {paused ? Icon.play : Icon.pause} {paused ? "Resume" : "Pause"}
+                      </button>
+                    </>
                   )}
-                </>
-              )}
-            </div>
-          )}
-          <ChatBar
-            meetingId={id}
+                </Menu>
+                <span className="time">{fmtDur(rec?.levels?.secs ?? 0)}</span>
+                <button title="Stop and write notes" onClick={() => api.recordStop()}>
+                  <span className="stop" />
+                </button>
+              </div>
+            ) : processing ? (
+              <div className="recctl">
+                <span className="spinner" style={{ margin: "0 6px" }} />
+                <span className="time">{m.step || "Writing notes…"}</span>
+              </div>
+            ) : (
+              <div className="recctl">
+                <button onClick={start} disabled={recordingOther} title={recordingOther ? "Another meeting is being recorded" : "Record this meeting"}>
+                  <Bars v={0} off /> <span style={{ fontSize: 12, fontWeight: 500 }}>{m.hasAudio ? "Resume" : "Start"}</span>
+                </button>
+                {!m.enhanced && canWrite && (
+                  <button onClick={() => regenerate()} title="Write notes now">
+                    {Icon.sparkle} <span style={{ fontSize: 12, fontWeight: 500 }}>Enhance</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <AskBar
+            scope="meeting"
+            scopeId={id}
             live={recordingThis}
-            placeholder={recordingThis ? "Ask anything about this meeting so far" : "Ask anything about this meeting"}
+            placeholder={recordingThis ? "Ask anything about this meeting so far" : "Ask anything"}
             onSubmit={(q) => {
               setChatOpen(true);
-              chat.ask(q);
+              thread.ask(q);
             }}
           />
         </div>
       </div>
 
-      {showTx && <Transcript m={m} segs={segs} live={recordingThis} onClose={() => setShowTx(false)} reload={load} />}
+      {showTx && <Transcript m={m} segs={segs} live={recordingThis} onClose={() => setShowTx(false)} reload={load} speakerName={speakerName} />}
+      {attEdit && <AttendeesModal m={m} onClose={() => setAttEdit(false)} onSaved={load} />}
+      {tplPick && (
+        <Modal onClose={() => setTplPick(false)}>
+          <h2>Templates</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            {canWrite ? "Pick one and your notes are rewritten in that shape." : "Your notes will be written in this shape after the meeting."}
+          </p>
+          <div className="tpl-list" style={{ maxHeight: "50vh" }}>
+            {templates.map((t) => (
+              <button key={t.id} className={`tpl ${t.id === m.templateId ? "on" : ""}`} onClick={() => pickTemplate(t.id)}>
+                <div className="tpl-name">{t.name}</div>
+                <div className="tpl-desc">{t.description}</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
 
       <div className="print-area">
         <h1>{m.title || "Meeting notes"}</h1>
-        <p className="print-meta">
+        <p>
           {dayLabel(m.createdAt)}, {timeOf(m.createdAt)}
           {m.durationS ? ` · ${fmtMinutes(m.durationS)}` : ""}
-          {m.app ? ` · ${m.app}` : ""}
         </p>
         <Markdown md={m.enhanced || m.myNotes} />
       </div>
@@ -448,25 +505,22 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: (r: Rou
   );
 }
 
-function Meter({ label, v, off }: { label: string; v: number; off?: boolean }) {
-  const bars = 5;
+function Bars({ v, off }: { v: number; off?: boolean }) {
+  const k = [0.45, 0.8, 1, 0.65];
   return (
-    <span className={`meter ${off ? "off" : ""}`} title={label}>
-      <span className="meter-label">{label}</span>
-      <span className="meter-bars">
-        {Array.from({ length: bars }, (_, i) => (
-          <i key={i} className={!off && v * bars * 1.4 > i ? "lit" : ""} />
-        ))}
-      </span>
+    <span className={`bars ${off ? "off" : ""}`}>
+      {k.map((x, i) => (
+        <i key={i} style={{ transform: `scaleY(${off ? 0.35 : Math.max(0.25, Math.min(1, v * 3 * x + 0.2))})` }} />
+      ))}
     </span>
   );
 }
 
 function Consent({ settings, onClose }: { settings: Settings; onClose: () => void }) {
   return (
-    <div className="banner consent">
+    <div className="banner">
       {Icon.shield}
-      <div className="consent-text">
+      <div className="t">
         <b>Let others know you're taking notes.</b> In some places everyone on a call has to agree to be recorded. Paste this in the meeting chat:
         <q>{settings.consent_message}</q>
       </div>
@@ -480,14 +534,41 @@ function Consent({ settings, onClose }: { settings: Settings; onClose: () => voi
   );
 }
 
-function Transcript({ m, segs, live, onClose, reload }: { m: Meeting; segs: Segment[]; live: boolean; onClose: () => void; reload: () => void }) {
+function AttendeesModal({ m, onClose, onSaved }: { m: Meeting; onClose: () => void; onSaved: () => void }) {
+  const [v, setV] = useState(m.attendees.split(/[,;]/).map((a) => a.trim()).filter(Boolean).join("\n"));
+  return (
+    <Modal onClose={onClose}>
+      <h2>Attendees</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        One per line, like <i>Dana Lee &lt;dana@acme.com&gt;</i>. They show up in People and Companies and help the notes.
+      </p>
+      <textarea style={{ width: "100%" }} rows={6} value={v} onChange={(e) => setV(e.target.value)} autoFocus />
+      <div className="actions">
+        <button className="btn ghost" onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          className="btn dark"
+          onClick={async () => {
+            await api.update(m.id, "attendees", v.split("\n").map((x) => x.trim()).filter(Boolean).join(", "));
+            onSaved();
+            onClose();
+          }}
+        >
+          Save
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function Transcript({ m, segs, live, onClose, reload, speakerName }: { m: Meeting; segs: Segment[]; live: boolean; onClose: () => void; reload: () => void; speakerName: (s: string) => string }) {
   const [q, setQ] = useState("");
   const [rename, setRename] = useState<{ speaker: string; name: string } | null>(null);
   const [edit, setEdit] = useState<{ id: number; text: string } | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const shown = q ? segs.filter((s) => s.text.toLowerCase().includes(q.toLowerCase())) : segs;
   const speakers = Array.from(new Set(segs.map((s) => s.speaker)));
-  // One bubble per speaker turn (consecutive lines, under ~320 characters).
   const groups: Segment[][] = [];
   for (const s of shown) {
     const g = groups[groups.length - 1];
@@ -500,9 +581,9 @@ function Transcript({ m, segs, live, onClose, reload }: { m: Meeting; segs: Segm
   return (
     <aside className="tx">
       <div className="tx-head">
-        <b>Transcript</b>
-        <div className="top-spacer" />
-        <button className="icon-btn" title="Copy transcript" onClick={() => copy(segs.map((s) => `${speakerName(m, s.speaker)}: ${s.text}`).join("\n"), "Transcript copied")}>
+        <span>Transcript</span>
+        <div className="spacer" />
+        <button className="icon-btn" title="Copy transcript" onClick={() => copy(segs.map((s) => `${speakerName(s.speaker)}: ${s.text}`).join("\n"), "Transcript copied")}>
           {Icon.copy}
         </button>
         <button className="icon-btn" onClick={onClose} aria-label="Close transcript">
@@ -518,7 +599,7 @@ function Transcript({ m, segs, live, onClose, reload }: { m: Meeting; segs: Segm
                 <input
                   key={s}
                   autoFocus
-                  className="speaker-input"
+                  style={{ height: 26, width: 140, borderRadius: 999, fontSize: 12 }}
                   value={rename.name}
                   placeholder={s}
                   onChange={(e) => setRename({ speaker: s, name: e.target.value })}
@@ -526,8 +607,8 @@ function Transcript({ m, segs, live, onClose, reload }: { m: Meeting; segs: Segm
                   onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                 />
               ) : (
-                <button key={s} className="speaker" onClick={() => setRename({ speaker: s, name: speakerName(m, s) === s ? "" : speakerName(m, s) })} title="Click to name this speaker">
-                  {speakerName(m, s)} {Icon.edit}
+                <button key={s} className="pill" onClick={() => setRename({ speaker: s, name: speakerName(s) === s ? "" : speakerName(s) })} title="Name this speaker">
+                  {speakerName(s)} {Icon.edit}
                 </button>
               ),
             )}
@@ -535,14 +616,14 @@ function Transcript({ m, segs, live, onClose, reload }: { m: Meeting; segs: Segm
         )}
       </div>
       <div className="tx-list">
-        {shown.length === 0 && <div className="empty-line">{live ? "Listening… text appears here a few seconds after people speak." : "No transcript yet."}</div>}
+        {shown.length === 0 && <div className="empty-line">{live ? "Listening… text appears a few seconds after people speak." : "No transcript yet."}</div>}
         {groups.map((g) => {
           const first = g[0];
           const text = g.map((x) => x.text).join(" ");
           return (
             <div key={first.id} className={`tx-line ${first.source === "mic" ? "me" : "them"}`}>
               <div className="tx-who">
-                {speakerName(m, first.speaker)} <span className="mono">{fmtDur(first.start)}</span>
+                {speakerName(first.speaker)} · {fmtDur(first.start)}
               </div>
               {edit?.id === first.id ? (
                 <textarea
@@ -562,14 +643,14 @@ function Transcript({ m, segs, live, onClose, reload }: { m: Meeting; segs: Segm
               )}
               {!live && (
                 <div className="tx-actions">
-                  <button className="icon-btn tiny" title="Copy" onClick={() => copy(text)}>
+                  <button className="icon-btn" title="Copy" onClick={() => copy(text)}>
                     {Icon.copy}
                   </button>
-                  <button className="icon-btn tiny" title="Edit" onClick={() => setEdit({ id: first.id, text })}>
+                  <button className="icon-btn" title="Edit" onClick={() => setEdit({ id: first.id, text })}>
                     {Icon.edit}
                   </button>
                   <button
-                    className="icon-btn tiny"
+                    className="icon-btn"
                     title="Delete these lines"
                     onClick={async () => {
                       for (const x of g) await api.segmentDelete(m.id, x.id);

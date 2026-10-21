@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "id": "notes",
+  "id": "cereal",
   "name": "Cereal",
   "tagline": "Free, local AI meeting notes. No bot joins your call.",
   "description": "Records your side and the other side of any call (Zoom, Google Meet, Teams, Slack) without a bot, transcribes it on your computer, tells speakers apart, and turns your rough notes into clean notes with decisions and action items. Search and chat across all your meetings. No account, no limits, no telemetry.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "repo": "sriptcollector/cereal",
   "identifier": "ai.toolbay.cereal",
   "license": "MIT",
@@ -25,7 +25,7 @@
   ],
   "platforms": {
     "windows-x86_64": {
-      "asset": "Cereal_0.1.2_x64-setup.exe",
+      "asset": "Cereal_0.2.0_x64-setup.exe",
       "kind": "nsis",
       "silentArgs": [
         "/S",
@@ -35,12 +35,12 @@
       "uninstaller": "uninstall.exe"
     },
     "darwin-aarch64": {
-      "asset": "Cereal_0.1.2_aarch64.dmg",
+      "asset": "Cereal_0.2.0_aarch64.dmg",
       "kind": "dmg",
       "app": "Cereal.app"
     },
     "darwin-x86_64": {
-      "asset": "Cereal_0.1.2_x64.dmg",
+      "asset": "Cereal_0.2.0_x64.dmg",
       "kind": "dmg",
       "app": "Cereal.app"
     }

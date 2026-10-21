@@ -27,6 +27,17 @@ pub fn header(out: &mut Vec<u8>, n_samples: u32) {
     out.extend_from_slice(&data.to_le_bytes());
 }
 
+/// Brings quiet audio up to a normal level (peak about 0.9, at most 20x louder), so
+/// low call volume doesn't hurt recognition. Silence stays silence.
+pub fn normalize(samples: &[f32]) -> Vec<f32> {
+    let peak = samples.iter().fold(0f32, |m, v| m.max(v.abs()));
+    if peak < 1e-4 {
+        return samples.to_vec();
+    }
+    let g = (0.9 / peak).clamp(1.0, 20.0);
+    samples.iter().map(|v| v * g).collect()
+}
+
 /// Reads a 16-bit PCM WAV (any rate/channels) as 16 kHz mono f32.
 pub fn decode(bytes: &[u8]) -> Option<Vec<f32>> {
     if bytes.len() < 44 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {

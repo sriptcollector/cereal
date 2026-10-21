@@ -14,7 +14,7 @@ Toolbay app (the same list lives in toolbay-flow/AGENTS.md).
    what to do, in plain words.
 2. **Simplicity first.** The smallest design that works. No setting where a good default will do.
 3. **One-step install, models included.** Whatever the app needs to work comes with the one install.
-   Notes bundles the speech, notes and speaker engines plus a starter speech model and both speaker
+   Cereal bundles the speech, notes and speaker engines plus a starter speech model and both speaker
    models in the installer; `toolbay.json` → `files` adds a notes model that works on any computer,
    so a hub install is complete. Better models for the hardware download quietly in the background.
 4. **Automatic model choice.** Picks models for the hardware (GPU vendor and memory, RAM, CPU
@@ -33,19 +33,25 @@ Toolbay app (the same list lives in toolbay-flow/AGENTS.md).
    official logo, small and unmodified, plus "Independent open-source project, not affiliated with
    or endorsed by Granola." Both come from `brand.json` → `inspiredBy`; the original's logo appears
    only inside that credit (onboarding, Settings > About, README header).
-10. **Theme.** Shared Toolbay tokens (`src/theme/toolbay-theme.css`, same file as the hub) with
-    the original app's layout and feel.
+10. **Theme.** Granola's layout and feel 1:1 (Orion's call for Cereal): warm paper background,
+    serif headings (Newsreader), Inter for UI, light and dark following the system. Tokens live in
+    `src/app/app.css` (`:root` / `[data-theme="dark"]`). A side-by-side check against Granola's
+    press-kit screens is kept outside the repo (never commit Granola's screenshots).
 11. **Lives under the hub.** `toolbay.json` ships with each release. Supports `--from-toolbay`,
     `--show`, `--hide`, `--quit`, `--start`, `--stop`, `--open <page>`, single instance,
     `running.json` ({pid, version, visible, window, updatedAt, hub, recording}) and the hub's
     `TOOLBAY_TOKEN` (memory only, never written to disk).
 
-## Notes-specific rules
+## Cereal-specific rules
 
 - **No bot joins the call.** Audio comes from two local tracks: the microphone ("You") and the
   computer's sound ("Them": WASAPI loopback on Windows, ScreenCaptureKit on macOS).
 - **Never mute, duck or pause other apps' audio.** Shared-mode capture only.
-- **Nothing records until the user clicks.** Detection only offers; it never starts by itself.
+- **Never record silently.** When a meeting starts, Cereal records automatically by default
+  (Settings › Preferences › When a meeting starts: Record automatically / Ask me / Do nothing,
+  plus per-app rules), but always shows the floating pill (Pause, Stop) and a card saying it
+  started; the first automatic recording shows the consent note. False alarms (under 60 s or no
+  voice) are deleted.
 - **Consent.** Keep the recording-consent reminder and the "let others know" message.
 - **Don't fork Toolbay Flow's engine.** Shared engine code lives in `crates/toolbay-engine`
   (catalog, downloads, whisper/llama/sherpa runners, hardware detection, cloud engines). Keep it
@@ -58,11 +64,16 @@ Toolbay app (the same list lives in toolbay-flow/AGENTS.md).
 - `src-tauri/src/capture.rs` (+ `capture_mac.rs`) two-track capture on one clock, live chunking.
 - `recorder.rs` sessions + live transcription. `process.rs` after-call pipeline: silence
   compaction, full-quality pass, diarization (parallel), echo removal. `notes.rs` templates,
-  notes (map-reduce for long meetings), chat. `detect.rs` call detection. `sync.rs` account sync.
-  `hub.rs` hub control. `cli.rs` headless test modes.
-- `src/app/` React UI (Home, Meeting, Ask, Templates, Settings, Onboarding, Popup, Pill).
+  notes (map-reduce for long meetings), chat with scopes and citations. `detect.rs` call detection
+  and auto-record (Windows mic registry, macOS 14.2+ CoreAudio per-process input). `calendar.rs`
+  private iCal feeds. `library.rs` folders, files, trash, threads, recipes, people/companies.
+  `library_cmds.rs` their commands plus import/export and voice questions. `account.rs` Toolbay
+  sign-in (keychain) and in-app feedback (slug `cereal`). `sync.rs` account sync. `hub.rs` hub
+  control. `cli.rs` headless test modes.
+- `src/app/` React UI: App (sidebar, routes, Ctrl+K search), Home, Meeting (+ Editor, TipTap),
+  Chat, Folder, People, Templates, Recipes, Trash, Settings, Onboarding, Feedback, Popup, Pill.
 
-## Working on Notes
+## Working on Cereal
 
 - `npm install`, then `npm run tauri dev` to run; `npm run tauri build` for the installer (fetches the
   bundled engines and models via `scripts/fetch-bundled.mjs`).

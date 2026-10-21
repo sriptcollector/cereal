@@ -334,7 +334,7 @@ fn take_chunk(t: &mut Track, min_s: f64, max_s: f64, flush: bool) -> Option<Chun
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let q = sorted[sorted.len() / 5];
     t.floor = (t.floor * 0.8 + q * 0.2).max(0.0005);
-    let thr = (t.floor * 3.5).max(0.006);
+    let thr = (t.floor * 3.5).max(0.0025);
     let voiced: Vec<bool> = f.iter().map(|e| *e > thr).collect();
     let n_voiced = voiced.iter().filter(|v| **v).count();
 

@@ -43,6 +43,96 @@ pub fn builtin() -> Vec<Template> {
             "Company and product\nTraction and metrics\nMarket and competition\nTeam\nThe raise: amount, terms, use of funds\nInvestor questions and concerns\nNext steps", "Note every number exactly as said."),
         t("brainstorm", "Brainstorm", "Idea sessions and workshops",
             "Problem we're solving\nIdeas: grouped by theme, with who proposed them\nFavourites and why\nConcerns\nDecisions and next steps", ""),
+        t("weekly-team", "Weekly team meeting", "Recurring team syncs",
+            "Wins since last week
+Project updates: status by project, with owners
+Risks and blockers
+Decisions
+Action items: owner and due date", ""),
+        t("sprint-planning", "Sprint planning", "Planning the next sprint or iteration",
+            "Sprint goal
+Committed work: items, owners, estimates
+Carried over
+Risks and dependencies
+Decisions
+Action items", ""),
+        t("retro", "Retrospective", "Looking back on a sprint or project",
+            "What went well
+What didn't
+What we'll change
+Action items: owner", "Keep it blameless and specific."),
+        t("design-crit", "Design review", "Design critiques and reviews",
+            "What was shown
+Feedback: what works, what doesn't, by person
+Open questions
+Decisions
+Next iteration: changes and owners", ""),
+        t("discovery", "Discovery call", "First calls with a prospect (BANT style)",
+            "Context: company, role, team
+Need: problem and impact, in their words
+Budget
+Authority: who decides
+Timeline
+Current solution and competitors
+Next steps with dates",
+            "Quote the prospect's exact words for needs and objections."),
+        t("pipeline-review", "Pipeline review", "Sales forecast and deal reviews",
+            "Deals discussed: stage, amount, close date, risks (one sub-list per deal)
+Forecast changes
+Help needed
+Action items", "Note every number exactly."),
+        t("customer-check-in", "Customer check-in", "Account reviews and QBRs with customers",
+            "How they're doing: usage, wins, health
+Issues and requests
+Renewal or expansion signals
+Risks
+Next steps", ""),
+        t("onboarding", "Customer onboarding", "Kick-offs and onboarding sessions",
+            "Goals and success criteria
+Setup steps done
+Open setup items: owner
+Questions asked
+Next session", ""),
+        t("interview-debrief", "Interview debrief", "Hiring panel debriefs",
+            "Candidate and role
+Each interviewer's take: strengths, concerns, vote
+Consensus
+Decision and next steps",
+            "Stay factual; never comment on protected traits."),
+        t("board-meeting", "Board meeting", "Board and investor updates",
+            "Highlights
+Metrics
+Strategy topics and board input
+Decisions and approvals
+Follow-ups", "Note every number exactly."),
+        t("investor-update", "Investor meeting", "Meetings with current or potential investors",
+            "Who and which fund
+Their questions
+Interest and concerns
+Terms discussed
+Next steps", ""),
+        t("all-hands", "All-hands", "Company-wide meetings",
+            "Announcements
+Company and team updates
+Q&A: question and answer
+Action items", ""),
+        t("coaching", "Coaching or mentoring", "Coaching sessions, mentoring, advice calls",
+            "Topics brought
+Advice and frameworks shared
+Reflections
+Commitments before next time", ""),
+        t("podcast", "Podcast or interview recording", "Recorded conversations and content",
+            "Guest and topic
+Key points in order
+Best quotes (verbatim)
+Stories and examples
+Show-notes links mentioned", "Prefer verbatim quotes."),
+        t("research-interview", "Research interview", "Academic or market research interviews",
+            "Participant background
+Answers by question
+Themes
+Notable quotes
+Follow-ups", ""),
         t("lecture", "Lecture or class", "Talks, classes, webinars and trainings",
             "Main topics in order\nKey concepts and definitions\nExamples given\nQuestions and answers\nThings to review or do", "Write it like good study notes."),
     ]

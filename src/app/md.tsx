@@ -1,13 +1,10 @@
 import { ReactNode } from "react";
+import type { Source } from "../api";
 
-/** A small Markdown renderer for meeting notes: headings, nested bullets, numbered
- *  lists, checkboxes, bold/italic/code. Lines that came from the user's own notes are
- *  marked `mine` (shown brighter); the AI's additions are shown softer. */
+/** A small Markdown renderer for chat answers and printing: headings, nested bullets,
+ *  numbered lists, checkboxes, bold/italic/code, and ⟦n⟧ citation chips. */
 
-type Block =
-  | { k: "h"; level: number; text: string }
-  | { k: "li"; depth: number; text: string; check: null | boolean; num: string | null }
-  | { k: "p"; text: string };
+type Block = { k: "h"; level: number; text: string } | { k: "li"; depth: number; text: string; check: null | boolean; num: string | null } | { k: "p"; text: string };
 
 export function parse(md: string): Block[] {
   const out: Block[] = [];
@@ -29,22 +26,50 @@ export function parse(md: string): Block[] {
   return out;
 }
 
-function inline(s: string): ReactNode[] {
+type CiteFn = (n: number) => Source | undefined;
+
+function inline(s: string, cite?: CiteFn, onCite?: (s: Source) => void): ReactNode[] {
   const parts: ReactNode[] = [];
-  const re = /(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`)/g;
+  const re = /(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`|⟦\d+⟧)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
   while ((m = re.exec(s))) {
     if (m.index > last) parts.push(s.slice(last, m.index));
     const t = m[0];
-    if (t.startsWith("**")) parts.push(<strong key={i++}>{t.slice(2, -2)}</strong>);
+    if (t.startsWith("⟦")) {
+      const n = Number(t.slice(1, -1));
+      const src = cite?.(n);
+      parts.push(
+        <button key={i++} className="cite" title={src?.title} onClick={() => src && onCite?.(src)}>
+          {n}
+        </button>,
+      );
+    } else if (t.startsWith("**")) parts.push(<strong key={i++}>{t.slice(2, -2)}</strong>);
     else if (t.startsWith("`")) parts.push(<code key={i++}>{t.slice(1, -1)}</code>);
     else parts.push(<em key={i++}>{t.slice(1, -1)}</em>);
     last = m.index + t.length;
   }
   if (last < s.length) parts.push(s.slice(last));
   return parts;
+}
+
+export function Markdown({ md, cite, onCite }: { md: string; cite?: CiteFn; onCite?: (s: Source) => void }) {
+  const blocks = parse(md);
+  return (
+    <div className="md">
+      {blocks.map((b, i) => {
+        if (b.k === "h") return <h3 key={i}>{inline(b.text, cite, onCite)}</h3>;
+        if (b.k === "p") return <p key={i}>{inline(b.text, cite, onCite)}</p>;
+        return (
+          <div key={i} className={`li d${b.depth} ${b.check === true ? "done" : ""}`}>
+            {b.check !== null ? <input type="checkbox" checked={b.check} readOnly /> : b.num ? <span className="num">{b.num}</span> : <span className="dot" />}
+            <span>{inline(b.text, cite, onCite)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 const STOP = new Set("the a an and or to of in on for with is are was were be it this that we i you they he she at by as from our my".split(" "));
@@ -60,9 +85,10 @@ export function words(s: string): string[] {
 export function mineMatcher(myNotes: string) {
   const lines = myNotes
     .split("\n")
-    .map((l) => words(l.replace(/^\s*([-*•]|\d+[.)]|#+)\s*/, "")))
+    .map((l) => words(l.replace(/^\s*([-*•]|\d+[.)]|#+|\[.?\])\s*/, "")))
     .filter((w) => w.length >= 1);
   return (text: string) => {
+    if (!lines.length) return false;
     const t = new Set(words(text));
     if (!t.size) return false;
     return lines.some((l) => {
@@ -72,45 +98,20 @@ export function mineMatcher(myNotes: string) {
   };
 }
 
-export function Markdown({ md, myNotes, onToggle }: { md: string; myNotes?: string; onToggle?: (lineText: string, done: boolean) => void }) {
-  const blocks = parse(md);
-  const mine = myNotes && myNotes.trim() ? mineMatcher(myNotes) : null;
-  return (
-    <div className="md">
-      {blocks.map((b, i) => {
-        if (b.k === "h") {
-          const C = (b.level <= 2 ? "h2" : "h3") as "h2" | "h3";
-          return <C key={i}>{inline(b.text)}</C>;
-        }
-        const cls = mine ? (mine(b.text) ? "mine" : "ai") : "";
-        if (b.k === "p") return <p key={i} className={cls}>{inline(b.text)}</p>;
-        return (
-          <div key={i} className={`li d${b.depth} ${cls} ${b.check === true ? "done" : ""}`}>
-            {b.check !== null ? (
-              <input type="checkbox" checked={b.check} onChange={(e) => onToggle?.(b.text, e.target.checked)} />
-            ) : b.num ? (
-              <span className="num">{b.num}</span>
-            ) : (
-              <span className="dot" />
-            )}
-            <span>{inline(b.text)}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Flip a checkbox in the markdown source. */
-export function toggleCheck(md: string, lineText: string, done: boolean): string {
-  return md
-    .split("\n")
-    .map((l) => {
-      const m = /^(\s*[-*]\s+)\[( |x|X)\](\s+)(.*)$/.exec(l);
-      if (m && m[4] === lineText) return `${m[1]}[${done ? "x" : " "}]${m[3]}${m[4]}`;
-      return l;
+/** Transcript lines most similar to a notes line (the "where did this come from" view). */
+export function sourcesFor<T extends { text: string }>(line: string, segs: T[], n = 4): T[] {
+  const w = new Set(words(line));
+  if (!w.size) return [];
+  return segs
+    .map((s) => {
+      const sw = words(s.text);
+      const hit = sw.filter((x) => w.has(x)).length;
+      return { s, score: hit / Math.sqrt(sw.length + 4) };
     })
-    .join("\n");
+    .filter((x) => x.score > 0.35)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, n)
+    .map((x) => x.s);
 }
 
 export function fmtDur(s: number) {

@@ -243,7 +243,7 @@ pub fn compact(a: &[f32]) -> (Vec<f32>, Vec<Span>) {
     let mut sorted = f.clone();
     sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
     let floor = sorted[sorted.len() / 5];
-    let thr = (floor * 3.5).max(0.006);
+    let thr = (floor * 3.5).max(0.0025);
     let n = f.len();
     let mut keep = vec![false; n];
     for (i, e) in f.iter().enumerate() {
@@ -321,7 +321,7 @@ async fn transcribe_track(st: &St, audio: &[f32], on_progress: impl Fn(f64)) -> 
     let mut prompt = vocab.clone();
     for (k, (a, b)) in pieces.iter().enumerate() {
         on_progress(k as f64 / pieces.len() as f64);
-        let bytes = wav::encode(&c[*a..*b]);
+        let bytes = wav::encode(&wav::normalize(&c[*a..*b]));
         let segs = match &base {
             Some(base) => stt::transcribe_segments(base, bytes, &lang, &prompt, Duration::from_secs(900)).await?,
             None => stt::transcribe_cloud(&cloud, bytes, &lang, &prompt).await?,
@@ -347,7 +347,7 @@ async fn diarize_track(st: &St, audio: &[f32]) -> Result<Vec<Turn>> {
     }
     let files = crate::engine::diar_files(st).await?;
     let tmp = st.data_dir.join(format!("diar-{}.wav", std::process::id()));
-    std::fs::write(&tmp, wav::encode(&c))?;
+    std::fs::write(&tmp, wav::encode(&wav::normalize(&c)))?;
     let tmp2 = tmp.clone();
     let turns = tokio::task::spawn_blocking(move || diar::diarize(&DiarModels { exe: &files.exe, segmentation: &files.segmentation, embedding: &files.embedding }, &tmp2, None, 1.0)).await??;
     let _ = std::fs::remove_file(&tmp);
