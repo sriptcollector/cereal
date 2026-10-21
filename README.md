@@ -30,7 +30,9 @@ and double-click it. No admin prompt, nothing else to install: the speech, speak
 model are inside. Cereal picks the best AI models for your computer and fetches them in the background.
 
 **macOS 13+:** download the `.dmg`. Allow Microphone and "Screen & System Audio Recording" when asked (only the sound is
-used, never your screen). Built and signed by CI; not yet tested on a real Mac.
+used, never your screen). Cereal isn't notarized by Apple yet, so macOS may say it "is damaged" or "can't be
+opened". It isn't damaged: after dragging it to Applications, open Terminal and run
+`xattr -dr com.apple.quarantine /Applications/Cereal.app` once. Not yet tested on a real Mac.
 
 **Through the Toolbay app:** find *Cereal* and click Install. One step, models included.
 

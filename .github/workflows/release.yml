@@ -78,6 +78,37 @@ jobs:
           else
             echo "No Apple certificate yet: ad-hoc signing only"
           fi
+      # The engines in Resources/bundled are separate programs and dylibs. Tauri only
+      # signs the main binary, so sign each one first, with the same identity as the
+      # app (notarization rejects any unsigned or ad-hoc code inside a Developer ID app).
+      - name: Sign bundled engines (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          id="-"; ts=""; kc=""
+          if [ -n "${APPLE_CERTIFICATE:-}" ]; then
+            kc="$RUNNER_TEMP/engines.keychain-db"; pw=$(uuidgen)
+            security create-keychain -p "$pw" "$kc"
+            security set-keychain-settings -lut 3600 "$kc"
+            security unlock-keychain -p "$pw" "$kc"
+            echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+            security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            rm "$RUNNER_TEMP/cert.p12"
+            security set-key-partition-list -S apple-tool:,apple: -s -k "$pw" "$kc" > /dev/null
+            security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+            id="$APPLE_SIGNING_IDENTITY"; ts="--timestamp"
+          fi
+          n=0
+          while IFS= read -r f; do
+            if file -b "$f" | grep -q Mach-O; then
+              codesign --force --options runtime $ts --entitlements src-tauri/Helper.entitlements --sign "$id" "$f"
+              n=$((n+1))
+            fi
+          done < <(find src-tauri/bundled/engines -type f)
+          echo "signed $n engine files with identity $id"
+          # tauri-action imports the certificate into its own keychain; don't leave a second copy.
+          if [ -n "$kc" ]; then security delete-keychain "$kc"; fi
       - name: Windows signing (if configured)
         if: matrix.os == 'windows-latest'
         shell: bash
@@ -99,7 +130,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Cereal ${{ github.ref_name }}"
-          releaseBody: "Free, local, open-source AI meeting notes. No bot joins your call. Download the installer for your computer below (Windows: .exe, Mac: .dmg). See the README for details."
+          releaseBody: "Free, local, open-source AI meeting notes. No bot joins your call. Download the installer for your computer below (Windows: .exe, Mac: .dmg). Mac: Cereal is not notarized yet; if macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/Cereal.app` once in Terminal. See the README for details."
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
@@ -116,10 +147,23 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -d --entitlements :- "$app" | grep -q audio-input
           codesign -d --verbose=4 "$app" 2>&1 | grep -E "^(Authority|Signature|TeamIdentifier|Runtime|flags)" || true
+          # Every engine program and dylib inside the app must be signed too, and must start.
+          bad=0
+          while IFS= read -r f; do
+            if file -b "$f" | grep -q Mach-O; then
+              codesign --verify --strict "$f" || { echo "::error::not signed: $f"; bad=1; }
+            fi
+          done < <(find "$app/Contents/Resources" -type f)
+          for e in whisper-server llama-server sherpa-onnx-offline-speaker-diarization; do
+            p=$(find "$app/Contents/Resources/bundled/engines" -type f -name "$e" | head -1)
+            "$p" --help > /dev/null 2>&1 || { echo "::error::$e does not start"; bad=1; }
+          done
+          [ $bad = 0 ]
           dmg=$(ls "$bundle"/dmg/*.dmg | head -1)
           mnt=$(hdiutil attach -nobrowse -readonly "$dmg" | tail -1 | awk -F'	' '{print $NF}')
           codesign --verify --deep --strict --verbose=2 "$mnt"/*.app
           hdiutil detach "$mnt"
+          syspolicy_check distribution "$app" || true
           if [ -n "${APPLE_ID:-}" ]; then
             spctl --assess --type execute --verbose=4 "$app"
             xcrun stapler validate "$app"

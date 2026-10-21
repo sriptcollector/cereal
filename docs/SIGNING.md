@@ -1,7 +1,7 @@
 # Code signing: what to buy and where to put it
 
 Unsigned apps trigger Windows SmartScreen ("Windows protected your PC") and macOS Gatekeeper
-("can't be opened because Apple cannot check it"). Signing removes those warnings. The release
+("can't be opened because Apple cannot check it" or "is damaged"). Signing removes those warnings. The release
 workflow turns signing on by itself once these repository secrets exist
 (GitHub → sriptcollector/cereal → Settings → Secrets and variables → Actions).
 
@@ -22,10 +22,20 @@ workflow turns signing on by itself once these repository secrets exist
 ## macOS: Apple Developer Program
 
 **Today (no Apple account):** every Mac build is ad-hoc signed with the hardened runtime and
-`src-tauri/Entitlements.plist` (microphone, Apple Events), and CI fails the release if
-`codesign --verify --deep --strict` doesn't pass on the app and on the app inside the DMG. A
-downloaded copy then gets "can't be opened because Apple cannot check it" with **Open Anyway** in
-System Settings → Privacy & Security, instead of "is damaged".
+`src-tauri/Entitlements.plist`; each bundled engine program and dylib is signed first with
+`src-tauri/Helper.entitlements`. CI fails the release if `codesign --verify --deep --strict` fails on
+the app or the app inside the DMG, if any engine file is unsigned, or if an engine doesn't start.
+The `mac-check` workflow (Actions → mac-check → tag) installs a published DMG the way a user does
+and runs `codesign`, `spctl` and `syspolicy_check` on it.
+
+That is as far as ad-hoc signing goes: a downloaded app that isn't notarized is still blocked by
+Gatekeeper. On recent macOS (15 Sequoia, 26) the message often says the app **"is damaged and can't
+be opened"** even though the signature is valid. Until there's a Developer ID, Mac users run this
+once after dragging Cereal to Applications:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Cereal.app
+```
 
 **With an Apple Developer account** the same workflow signs with your Developer ID, notarizes with
 `notarytool`, staples the ticket and checks it with `spctl`. Nothing to change in the code: add the
