@@ -8,6 +8,22 @@ let enterSends = true;
 const loadEnter = () => api.getSettings().then((x) => (enterSends = x.chat_enter !== "newline")).catch(() => {});
 loadEnter();
 on("settings-changed", loadEnter);
+/** Recipes that only make sense during a meeting (shown as chips while recording). */
+const LIVE = ["missed", "smart", "explain"];
+
+/** Splits "Follow-ups: a | b" off the end of an answer. */
+export function splitFollowUps(text: string): [string, string[]] {
+  // Only the answer's last line, so a "Follow-ups" section inside an answer stays.
+  const m = /(?:^|\n)\s*\**follow-?ups?\**\s*:\**\s*([^\n]*?)\s*$/i.exec(text);
+  if (!m || !m[1].includes("?")) return [text, []];
+  const qs = m[1]
+    .split(/\s*\|\s*/)
+    .map((q) => q.trim())
+    .filter((q) => q.length > 3)
+    .slice(0, 3);
+  return [text.slice(0, m.index).trimEnd(), qs];
+}
+
 const sendKey = (e: { key: string; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) =>
   e.key === "Enter" && (enterSends ? !e.shiftKey : e.ctrlKey || e.metaKey);
 
@@ -77,7 +93,7 @@ export function Thread({ t, onSource }: { t: ReturnType<typeof useThread>; onSou
           </div>
         ) : (
           <div key={m.id} className="msg-ai">
-            <Cited text={m.content} sources={m === lastAi ? t.sources : []} onSource={onSource} />
+            <Cited text={splitFollowUps(m.content)[0]} sources={m === lastAi ? t.sources : []} onSource={onSource} />
             {m === lastAi && t.sources.length > 0 && (
               <div className="sources">
                 {t.sources.map((s) => (
@@ -87,15 +103,24 @@ export function Thread({ t, onSource }: { t: ReturnType<typeof useThread>; onSou
                 ))}
               </div>
             )}
+            {m === lastAi && t.streaming === null && splitFollowUps(m.content)[1].length > 0 && (
+              <div className="followups">
+                {splitFollowUps(m.content)[1].map((q) => (
+                  <button key={q} onClick={() => t.ask(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="tools">
-              <button className="icon-btn" title="Copy" onClick={() => copy(m.content.replace(/\[\d+\]/g, ""))}>
+              <button className="icon-btn" title="Copy" onClick={() => copy(splitFollowUps(m.content)[0].replace(/\[\d+\]/g, ""))}>
                 {Icon.copy}
               </button>
             </div>
           </div>
         ),
       )}
-      {t.streaming !== null && <div className="msg-ai">{t.streaming ? <Markdown md={t.streaming} /> : <p className="thinking">Reading your notes…</p>}</div>}
+      {t.streaming !== null && <div className="msg-ai">{t.streaming ? <Markdown md={splitFollowUps(t.streaming)[0]} /> : <p className="thinking">Reading your notes…</p>}</div>}
       {t.error && <div className="banner bad">{t.error}</div>}
       <div ref={end} />
     </div>
@@ -141,7 +166,7 @@ function useSlash(value: string, kind: "single" | "multi" | "any", live?: boolea
     slash === null
       ? []
       : recipes.filter(
-          (r) => (kind === "any" || r.kind === kind) && (r.cmd !== "missed" || live) && (r.cmd.startsWith(slash) || r.name.toLowerCase().includes(slash)),
+          (r) => (kind === "any" || r.kind === kind) && (!LIVE.includes(r.cmd) || live) && (r.cmd.startsWith(slash) || r.name.toLowerCase().includes(slash)),
         );
   return list;
 }
@@ -179,6 +204,7 @@ export default function AskBar({
 }) {
   const [v, setV] = useState("");
   const [sel, setSel] = useState(0);
+  const [recipes] = useRecipes();
   const list = useSlash(v, scope === "meeting" ? "single" : scope === "all" || scope === "folder" || scope === "selected" ? "multi" : "any", live);
   const send = (q: string) => {
     if (!q.trim()) return;
@@ -198,6 +224,17 @@ export default function AskBar({
   return (
     <div className="askbar-wrap">
       <RecipeList list={list} sel={sel} setSel={setSel} pick={(r) => send(r.prompt)} />
+      {live && !v && (
+        <div className="live-chips">
+          {recipes
+            .filter((r) => LIVE.includes(r.cmd))
+            .map((r) => (
+              <button key={r.id} onClick={() => send(r.prompt)}>
+                {r.name}
+              </button>
+            ))}
+        </div>
+      )}
       <div className="askbar">
         {extra}
         <textarea rows={1} value={v} placeholder={placeholder} onChange={(e) => (setV(e.target.value), setSel(0))} onKeyDown={key} />
@@ -259,7 +296,7 @@ export function AskCard({ placeholder, onSubmit, kind, chips, compact }: { place
         </div>
         <div className="recipe-links">
           {recipes
-            .filter((r) => r.kind === kind && r.cmd !== "missed")
+            .filter((r) => r.kind === kind && !LIVE.includes(r.cmd))
             .slice(0, chips ?? 3)
             .map((r) => (
               <button key={r.id} onClick={() => send(r.prompt)}>
@@ -314,7 +351,7 @@ export function AskCard({ placeholder, onSubmit, kind, chips, compact }: { place
       {chips !== 0 && (
         <div className="recipe-chips" style={{ marginTop: 12 }}>
           {recipes
-            .filter((r) => r.kind === kind && r.cmd !== "missed")
+            .filter((r) => r.kind === kind && !LIVE.includes(r.cmd))
             .slice(0, chips ?? 5)
             .map((r) => (
               <button key={r.id} className="rchip" onClick={() => send(r.prompt)}>

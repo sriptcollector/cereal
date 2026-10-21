@@ -2398,3 +2398,27 @@ button.pill:hover {
   gap: 6px;
   align-items: center;
 }
+
+/* suggested follow-up questions and live prompts */
+.followups,
+.live-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.followups button,
+.live-chips button {
+  border: 1px solid var(--line-2);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  text-align: left;
+}
+.followups button:hover,
+.live-chips button:hover {
+  background: var(--hover);
+  color: var(--ink);
+}

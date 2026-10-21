@@ -378,7 +378,7 @@ pub fn unbold(md: &str) -> String {
 
 // ---------------- chat ----------------
 
-const CHAT_SYSTEM: &str = "You answer questions about the user's meetings, using only the material provided. The user is \"{me}\". Be direct and concise; use short bullets when listing. Each source is numbered like [1]; when you use something from a source, cite it with its number in square brackets right after the sentence, e.g. [2]. If the material doesn't contain the answer, say so plainly instead of guessing. If asked to write something (an email, a summary, a message), write it ready to copy.";
+const CHAT_SYSTEM: &str = "You answer questions about the user's meetings, using only the material provided. The user is \"{me}\". Be direct and concise; use short bullets when listing. Each source is numbered like [1]; when you use something from a source, cite it with its number in square brackets right after the sentence, e.g. [2]. If the material doesn't contain the answer, say so plainly instead of guessing. If asked to write something (an email, a summary, a message), write it ready to copy. Finally, on its own last line, write \"Follow-ups:\" and two short questions the user might ask next, separated by \" | \".";
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

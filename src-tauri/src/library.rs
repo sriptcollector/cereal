@@ -116,6 +116,8 @@ pub fn builtin_recipes() -> Vec<Recipe> {
         r("blindspots", "Blind spots", "multi", "Looking across these meetings, what risks, open questions or recurring problems am I not paying enough attention to?"),
         r("decisions", "List key decisions", "multi", "List the key decisions made in these meetings, newest first, with the meeting each came from."),
         r("missed", "What did I miss?", "single", "Summarize what was said in the last few minutes, in 3 bullets."),
+        r("smart", "Make me sound smart", "single", "Based on the last few minutes, suggest one thoughtful question or point I could raise right now, in one or two sentences."),
+        r("explain", "What does that mean?", "single", "Explain the terms, names or acronyms mentioned in the last few minutes that I might not know, briefly."),
         r("brief", "Prep me for this meeting", "single", "Using my past notes with these people, give me 2-3 bullets to prepare: open threads, what they care about, and what to follow up on."),
         r("catchup", "Catch me up", "multi", "Catch me up on these meetings: the main things that happened and what needs my attention."),
         r("year", "My year in meetings", "multi", "Give me a fun, honest recap of my year in meetings: how many, the main themes, the people I met with most, and the biggest decisions."),
