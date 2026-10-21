@@ -52,6 +52,8 @@ installs Notes and its notes AI model in one step, and opens it.
 
 Measured on a desktop with an RTX 4070 Ti (12 GB) and 32 threads, for a **44-minute, 4-person meeting**:
 final transcript with speakers **45 s** after the call, notes **21 s** later: about **66 s** in total.
+Without a GPU (same PC, CPU only, small speech model + Qwen3 4B) the transcript is written live during the call and the
+notes take about **9 minutes** after a 44-minute meeting; a typical laptop is slower.
 
 ## Features
 
