@@ -42,6 +42,7 @@ export interface Settings {
   notion_token: string;
   notion_page: string;
   hubspot_token: string;
+  screen_snapshots: boolean;
   transcript_retention: string;
   theme: "system" | "light" | "dark";
   beta: boolean;
@@ -329,6 +330,9 @@ export const api = {
   syncStatus: () => invoke<[boolean, boolean]>("sync_status"),
   pillClick: () => invoke<void>("pill_click"),
   stillHere: () => invoke<void>("still_here"),
+  screens: (id: string) => invoke<{ name: string; thumb: string }[]>("screens_list", { id }),
+  screenToNote: (id: string, name: string) => invoke<void>("screen_to_note", { id, name }),
+  screenRemove: (id: string, name: string) => invoke<void>("screen_remove", { id, name }),
   sendToNotion: (id: string) => invoke<string>("send_to_notion", { id }),
   sendToHubspot: (id: string) => invoke<number>("send_to_hubspot", { id }),
   postText: (folder: string, text: string) => invoke<void>("post_text", { folder, text }),

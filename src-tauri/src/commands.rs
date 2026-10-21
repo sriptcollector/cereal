@@ -449,6 +449,21 @@ pub fn calendar_draft(app: AppHandle, summary: String, details: String) -> R<()>
     app.opener().open_path(p.display().to_string(), None::<&str>).map_err(e)
 }
 
+#[tauri::command]
+pub fn screens_list(st: State<St>, id: String) -> Vec<crate::screens::Shot> {
+    crate::screens::list(&st, &id)
+}
+
+#[tauri::command]
+pub fn screen_to_note(st: State<St>, id: String, name: String) -> R<()> {
+    crate::screens::add_to_note(&st, &id, &name).map_err(e)
+}
+
+#[tauri::command]
+pub fn screen_remove(st: State<St>, id: String, name: String) -> R<()> {
+    crate::screens::remove(&st, &id, &name).map_err(e)
+}
+
 /// "Keep going" on the Still there? card.
 #[tauri::command]
 pub fn still_here(st: State<St>) {

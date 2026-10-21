@@ -115,6 +115,7 @@ pub fn start_with(st: &St, meeting_id: Option<String>, app: &str, title: &str, a
     log::info!("recording started: {} ({})", m.id, if app.is_empty() { "manual" } else { app });
     crate::sounds::play(st, if offset > 0.0 { crate::sounds::Cue::Resume } else { crate::sounds::Cue::Start });
     live_loop(st.clone(), m.id.clone(), offset, stop);
+    crate::screens::snapshot_loop(st.clone(), m.id.clone());
     crate::refresh_tray(st);
     st.meeting_changed(&m.id);
     st.emit("recording", state(st));

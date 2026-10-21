@@ -479,6 +479,7 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
                 onTemplateSlash={() => setTplPick(true)}
               />
             )}
+            <Screens id={id} onAdded={load} />
             {showAi && myNotes.trim() && !processing && (
               <div className="ai-legend">
                 <span>
@@ -595,6 +596,37 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
           {m.durationS ? ` · ${fmtMinutes(m.durationS)}` : ""}
         </p>
         <Markdown md={m.enhanced || m.myNotes} />
+      </div>
+    </div>
+  );
+}
+
+/** Snapshots of shared screens kept during the meeting (Settings › Take snapshots). */
+function Screens({ id, onAdded }: { id: string; onAdded: () => void }) {
+  const [shots, setShots] = useState<{ name: string; thumb: string }[]>([]);
+  useEffect(() => {
+    const load = () => api.screens(id).then(setShots).catch(() => {});
+    load();
+    return on<string>("screens-changed", (mid) => mid === id && load());
+  }, [id]);
+  if (!shots.length) return null;
+  return (
+    <div className="screens">
+      <div className="screens-head">Screens from this meeting</div>
+      <div className="screens-row">
+        {shots.map((x) => (
+          <div key={x.name} className="shot">
+            <img src={x.thumb} alt="" />
+            <div className="shot-tools">
+              <button className="btn" onClick={() => api.screenToNote(id, x.name).then(onAdded)}>
+                Add to notes
+              </button>
+              <button className="icon-btn" title="Remove" onClick={() => api.screenRemove(id, x.name).then(() => setShots((v) => v.filter((y) => y.name !== x.name)))}>
+                {Icon.close}
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

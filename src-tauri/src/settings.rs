@@ -58,6 +58,8 @@ pub struct Settings {
     pub notion_page: String,
     /// HubSpot private app token (device only).
     pub hubspot_token: String,
+    /// Keep screenshots when the screen changes during a meeting (shared slides).
+    pub screen_snapshots: bool,
 
     // ---- profile (improves notes) ----
     pub job_title: String,
@@ -131,6 +133,7 @@ impl Default for Settings {
             notion_token: String::new(),
             notion_page: String::new(),
             hubspot_token: String::new(),
+            screen_snapshots: false,
             job_title: String::new(),
             about: String::new(),
             role: String::new(),
