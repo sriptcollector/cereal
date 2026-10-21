@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: npm ci
+      - run: npx tsc --noEmit && npx vite build
+      - run: npm run bundle
+        env:
+          TAURI_ENV_TARGET_TRIPLE: ${{ matrix.target }}
+      - run: cargo test --workspace
+        if: matrix.os == 'windows-latest'
+      - run: cargo build -p toolbay-notes --target ${{ matrix.target }}
+        if: matrix.os == 'macos-latest'
