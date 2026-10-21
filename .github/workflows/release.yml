@@ -130,7 +130,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Cereal ${{ github.ref_name }}"
-          releaseBody: "Free, local, open-source AI meeting notes. No bot joins your call. Download the installer for your computer below (Windows: .exe, Mac: .dmg). Mac: Cereal is not notarized yet; if macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/Cereal.app` once in Terminal. See the README for details."
+          releaseBody: "Free, local, open-source AI meeting notes. No bot joins your call. Download the installer for your computer below (Windows: .exe, Mac: .dmg). Mac: download the .pkg for your Mac (aarch64 = Apple silicon, x64 = Intel); if macOS says it's from an unidentified developer, open System Settings › Privacy & Security › Open Anyway. See the README for details."
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
@@ -164,6 +164,44 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$mnt"/*.app
           hdiutil detach "$mnt"
           syspolicy_check distribution "$app" || true
+          # What a downloader sees (printed, not fatal).
+          tmp=$(mktemp -d); cp -R "$app" "$tmp/"; qapp="$tmp/$(basename "$app")"
+          xattr -w com.apple.quarantine "0081;$(printf %x $(date +%s));Safari;" "$qapp"
+          echo "Gatekeeper verdict for a downloaded copy:"; spctl -a -vv -t exec "$qapp" 2>&1 || true
+
+      # A .pkg avoids the "damaged" message until there's a Developer ID: unsigned it gets
+      # "unidentified developer / Open Anyway", and the app the Installer puts in
+      # /Applications isn't quarantined.
+      - name: macOS installer package
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_INSTALLER_IDENTITY: ${{ secrets.APPLE_INSTALLER_IDENTITY }}
+        run: |
+          set -euo pipefail
+          triple=${{ contains(matrix.args, 'aarch64') && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
+          arch=${{ contains(matrix.args, 'aarch64') && 'aarch64' || 'x64' }}
+          ver=${GITHUB_REF_NAME#v}
+          app=$(ls -d target/$triple/release/bundle/macos/*.app | head -1)
+          chmod +x scripts/macos-pkg/postinstall
+          out="Cereal_${ver}_${arch}.pkg"
+          sign=()
+          if [ -n "${APPLE_INSTALLER_IDENTITY:-}" ]; then sign=(--sign "$APPLE_INSTALLER_IDENTITY"); fi
+          # Fixed location: never "relocate" the install onto an old copy elsewhere.
+          root=$(mktemp -d); cp -R "$app" "$root/"
+          pkgbuild --analyze --root "$root" comp.plist
+          plutil -replace 0.BundleIsRelocatable -bool NO comp.plist
+          pkgbuild --root "$root" --component-plist comp.plist --install-location /Applications             --identifier ai.toolbay.cereal.pkg --version "$ver" --scripts scripts/macos-pkg ${sign[@]+"${sign[@]}"} "$out"
+          xattr -w com.apple.quarantine "0081;$(printf %x $(date +%s));Safari;" "$out"
+          echo "Gatekeeper verdict for the downloaded .pkg:"; spctl -a -vv -t install "$out" 2>&1 || true
+          xattr -d com.apple.quarantine "$out"
+          # Prove it installs and the installed app is intact and not flagged.
+          sudo installer -pkg "$out" -target /
+          codesign --verify --deep --strict --verbose=2 "/Applications/Cereal.app"
+          if xattr -p com.apple.quarantine "/Applications/Cereal.app" 2>/dev/null; then echo "installed app is quarantined"; exit 1; fi
+          echo "Installed app is clean."
+          gh release upload "$GITHUB_REF_NAME" "$out" --clobber
           if [ -n "${APPLE_ID:-}" ]; then
             spctl --assess --type execute --verbose=4 "$app"
             xcrun stapler validate "$app"

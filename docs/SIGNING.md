@@ -30,8 +30,10 @@ and runs `codesign`, `spctl` and `syspolicy_check` on it.
 
 That is as far as ad-hoc signing goes: a downloaded app that isn't notarized is still blocked by
 Gatekeeper. On recent macOS (15 Sequoia, 26) the message often says the app **"is damaged and can't
-be opened"** even though the signature is valid. Until there's a Developer ID, Mac users run this
-once after dragging Cereal to Applications:
+be opened"** even though the signature is valid. Until there's a Developer ID, each release also has
+`Cereal_x.y.z_<arch>.pkg`: an unsigned installer package gets the softer "unidentified developer / Open Anyway"
+warning, and the app the macOS Installer places in /Applications isn't quarantined (CI installs it and checks).
+With the DMG instead, Mac users run this once after dragging Cereal to Applications:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Cereal.app

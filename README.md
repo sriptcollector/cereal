@@ -29,10 +29,11 @@ Written from scratch (Tauri 2 + Rust + React). No code, assets or services from 
 and double-click it. No admin prompt, nothing else to install: the speech, speaker and notes engines and a starter speech
 model are inside. Cereal picks the best AI models for your computer and fetches them in the background.
 
-**macOS 13+:** download the `.dmg`. Allow Microphone and "Screen & System Audio Recording" when asked (only the sound is
-used, never your screen). Cereal isn't notarized by Apple yet, so macOS may say it "is damaged" or "can't be
-opened". It isn't damaged: after dragging it to Applications, open Terminal and run
-`xattr -dr com.apple.quarantine /Applications/Cereal.app` once. Not yet tested on a real Mac.
+**macOS 13+:** download `Cereal_x.y.z_aarch64.pkg` (Apple silicon) or `_x64.pkg` (Intel) and open it. Cereal isn't
+notarized by Apple yet, so macOS may say it's from an unidentified developer: System Settings › Privacy & Security ›
+**Open Anyway**. Allow Microphone and "Screen & System Audio Recording" when asked (only the sound is used, never your
+screen). Not yet tested on a real Mac. (The `.dmg` works too, but macOS calls a downloaded un-notarized app "damaged";
+`xattr -dr com.apple.quarantine /Applications/Cereal.app` fixes that.)
 
 **Through the Toolbay app:** find *Cereal* and click Install. One step, models included.
 
