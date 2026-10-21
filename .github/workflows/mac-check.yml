@@ -22,7 +22,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -uo pipefail
+          set +e
           sw_vers
           gh release download "${{ inputs.tag }}" -R "${{ github.repository }}" -p "*_${{ matrix.arch }}.dmg" -D dl
           dmg=$(ls dl/*.dmg)
@@ -42,4 +42,14 @@ jobs:
               s=$(codesign -dv "$f" 2>&1 | grep -E "^Signature|not signed" | head -1)
               echo "$f :: $(file -b "$f" | cut -c1-60) :: ${s:-?}"
             fi
+          done
+          echo "== launch with quarantine removed (what xattr -dr does)"
+          xattr -dr com.apple.quarantine "$app"
+          "$app/Contents/MacOS/cereal" > launch.log 2>&1 &
+          pid=$!; sleep 15
+          if kill -0 $pid 2>/dev/null; then echo "app running after 15 s"; kill $pid; else echo "app exited:"; cat launch.log; fi
+          echo "== bundled engines start"
+          for e in $(find "$app/Contents/Resources/bundled/engines" -type f -perm +111 -name "*-server" -o -type f -name "sherpa-onnx-offline-speaker-diarization"); do
+            "$e" --help > out.txt 2>&1; echo "$(basename "$e"): exit $?  $(head -c 200 out.txt | tr '
+' ' ')"
           done
