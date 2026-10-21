@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Toolbay Notes",
   "mainBinaryName": "toolbay-notes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "ai.toolbay.notes",
   "build": {
     "beforeDevCommand": "npm run dev",

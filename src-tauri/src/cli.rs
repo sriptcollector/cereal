@@ -81,6 +81,20 @@ pub fn run(args: &[String]) -> Option<i32> {
         }
         return Some(0);
     }
+    if let Some(i) = pos("--ask") {
+        // --ask <meeting-id|all> "<question>": chat answer, saved to the meeting's chat.
+        let scope = args.get(i + 1)?.clone();
+        let q = args.get(i + 2)?.clone();
+        let (cfg, data) = data_dirs();
+        let st = St::new(None, cfg, data, bundled()).ok()?;
+        let t = Instant::now();
+        let r = tauri::async_runtime::block_on(crate::notes::ask(&st, if scope == "all" { None } else { Some(scope) }, &q, "cli"));
+        match r {
+            Ok(a) => println!("{a}\n=== {:.1}s", t.elapsed().as_secs_f64()),
+            Err(e) => println!("error: {e:#}"),
+        }
+        return Some(0);
+    }
     if let Some(i) = pos("--process") {
         let mic = PathBuf::from(args.get(i + 1)?);
         let sys = PathBuf::from(args.get(i + 2)?);

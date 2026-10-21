@@ -115,14 +115,14 @@ You get:
 Rules:
 1. Build on MY NOTES. Every point the user wrote must appear in your notes (fix typos and expand it with details from the transcript, but keep the user's wording where you can). Headings the user wrote are sections you must keep.
 2. Add the other important points from the transcript: facts, numbers, names, dates, decisions, commitments, open questions.
-3. Only write what was said or written. Never invent names, numbers, dates or owners. If an owner or date wasn't said, leave it out.
+3. Only write what was said or written. Never invent names, numbers, dates, deadlines or owners. If an owner or a deadline wasn't said, leave it out (write "- [ ] task" with no owner).
 4. Format: "### " for section headings, "- " bullets, two-space indented sub-bullets for detail. Action items as "- [ ] Owner: task (by when)". No bold text.
 5. Skip sections with nothing to put in them. No intro, no conclusion, no "Summary:" preamble, no notes about these rules.
 6. Write in the language the meeting was held in.
 7. The very first line must be: Title: <a short, specific title for this meeting, max 8 words>
 Then a blank line, then the notes."####;
 
-const PART_SYSTEM: &str = "You condense part of a meeting transcript into dense, factual notes for a later summary. Output only bullets. Keep: topics, key points with who said them, every number, name, date and product mentioned, decisions, commitments and action items (who, what, when), open questions. Drop small talk and filler. Never invent anything. The user is \"{me}\".";
+const PART_SYSTEM: &str = "You condense part of a meeting transcript into dense, factual notes for a later summary. Output only bullets, at most 30. Keep: topics, key points with who said them, every number, name, date and product mentioned, decisions, commitments and action items (who, what, when), open questions. Drop small talk and filler. Never invent anything. The user is \"{me}\".";
 
 fn template_block(t: &Template) -> String {
     let mut s = format!("TEMPLATE: {}\n", t.name);
@@ -186,7 +186,7 @@ pub async fn enhance(st: &St, id: &str, template_id: Option<String>) -> Result<S
             st.meeting_changed(id);
             let sys = PART_SYSTEM.replace("{me}", &me);
             let u = format!("PART {} OF {}:\n{}", i + 1, pieces.len(), p);
-            let out = llm.chat(&sys, &[msg("user", u)], 1200, Duration::from_secs(600)).await?;
+            let out = llm.chat(&sys, &[msg("user", u)], 900, Duration::from_secs(900)).await?;
             parts.push_str(&format!("PART {} NOTES:\n{}\n\n", i + 1, out.trim()));
         }
         let _ = st.db.set(id, "step", "Writing your notes…");

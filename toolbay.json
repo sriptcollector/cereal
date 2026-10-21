@@ -4,7 +4,7 @@
   "name": "Toolbay Notes",
   "tagline": "Free, local AI meeting notes. No bot joins your call.",
   "description": "Records your side and the other side of any call (Zoom, Google Meet, Teams, Slack) without a bot, transcribes it on your computer, tells speakers apart, and turns your rough notes into clean notes with decisions and action items. Search and chat across all your meetings. No account, no limits, no telemetry.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repo": "sriptcollector/toolbay-notes",
   "identifier": "ai.toolbay.notes",
   "license": "MIT",
@@ -25,7 +25,7 @@
   ],
   "platforms": {
     "windows-x86_64": {
-      "asset": "Toolbay.Notes_0.1.0_x64-setup.exe",
+      "asset": "Toolbay.Notes_0.1.1_x64-setup.exe",
       "kind": "nsis",
       "silentArgs": [
         "/S",
@@ -35,12 +35,12 @@
       "uninstaller": "uninstall.exe"
     },
     "darwin-aarch64": {
-      "asset": "Toolbay.Notes_0.1.0_aarch64.dmg",
+      "asset": "Toolbay.Notes_0.1.1_aarch64.dmg",
       "kind": "dmg",
       "app": "Toolbay Notes.app"
     },
     "darwin-x86_64": {
-      "asset": "Toolbay.Notes_0.1.0_x64.dmg",
+      "asset": "Toolbay.Notes_0.1.1_x64.dmg",
       "kind": "dmg",
       "app": "Toolbay Notes.app"
     }

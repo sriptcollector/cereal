@@ -38,7 +38,8 @@ pub fn recommend(h: &Hardware, language: &str) -> Choice {
         Choice { tier: "gpu", speech_model: "large-v3-turbo-q5".into(), llm_model: "qwen3-1.7b".into(), final_pass: true, why: format!("{} with {} GB", gpu_name, h.vram_mb / 1024) }
     } else if other_gpu {
         Choice { tier: "gpu-notes", speech_model: ml("small.en-q5", "small-q5"), llm_model: "qwen3-4b-instruct".into(), final_pass: false, why: format!("{} (notes on GPU, speech on CPU)", gpu_name) }
-    } else if h.threads >= 12 && h.ram_mb >= 15000 {
+    } else if h.threads >= 8 && h.ram_mb >= 12000 {
+        // Notes are written after the call, so a CPU can take the better notes model.
         Choice { tier: "cpu", speech_model: ml("small.en-q5", "small-q5"), llm_model: "qwen3-4b-instruct".into(), final_pass: false, why: format!("{}-thread CPU, no fast GPU", h.threads) }
     } else if h.threads >= 8 && h.ram_mb >= 7000 {
         Choice { tier: "cpu", speech_model: ml("small.en-q5", "small-q5"), llm_model: "qwen3-1.7b".into(), final_pass: false, why: format!("{}-thread CPU, no fast GPU", h.threads) }
@@ -151,7 +152,8 @@ pub async fn ensure_llama(st: &St) -> Result<String> {
         "-np".into(),
         "1".into(),
         "-t".into(),
-        threads().to_string(),
+        // On the CPU, use the physical cores (hyper-threads don't help).
+        if eng.gpu { threads().to_string() } else { (std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8) / 2).clamp(4, 16).to_string() },
         "--no-webui".into(),
         "--jinja".into(),
         "-ngl".into(),

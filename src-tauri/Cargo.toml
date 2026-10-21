@@ -1,6 +1,6 @@
 [package]
 name = "toolbay-notes"
-version = "0.1.0"
+version = "0.1.1"
 description = "Toolbay Notes: free, local, open-source AI meeting notes. No bot joins your call."
 authors = ["Orion Jones"]
 license = "MIT"
