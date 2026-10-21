@@ -141,6 +141,9 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
           <Row title="Live meeting indicator" desc="A small floating control while notes are being taken and Cereal isn't in front. Always shown for recordings that start by themselves.">
             <Toggle on={s.show_indicator} onChange={(v) => save({ show_indicator: v })} />
           </Row>
+          <Row title="Speaker names" desc="Suggest names for the other speakers from the meeting's attendees (and name the other person in a 1:1 with one click).">
+            <Toggle on={s.speaker_suggestions} onChange={(v) => save({ speaker_suggestions: v })} />
+          </Row>
           <Row title="Take snapshots of shared screens" desc="During meetings, keep a picture of your screen when it changes (like a new slide). They stay with the note; add the ones you want to your notes.">
             <Toggle on={s.screen_snapshots} onChange={(v) => save({ screen_snapshots: v })} />
           </Row>

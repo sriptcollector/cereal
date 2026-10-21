@@ -2466,3 +2466,11 @@ pre.code {
   align-items: center;
   margin-top: 4px;
 }
+
+.speaker-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}

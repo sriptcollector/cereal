@@ -60,6 +60,8 @@ pub struct Settings {
     pub hubspot_token: String,
     /// Keep screenshots when the screen changes during a meeting (shared slides).
     pub screen_snapshots: bool,
+    /// Suggest speaker names from the meeting's attendees.
+    pub speaker_suggestions: bool,
 
     // ---- profile (improves notes) ----
     pub job_title: String,
@@ -134,6 +136,7 @@ impl Default for Settings {
             notion_page: String::new(),
             hubspot_token: String::new(),
             screen_snapshots: false,
+            speaker_suggestions: true,
             job_title: String::new(),
             about: String::new(),
             role: String::new(),

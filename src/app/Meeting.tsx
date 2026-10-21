@@ -692,10 +692,27 @@ function AttendeesModal({ m, onClose, onSaved }: { m: Meeting; onClose: () => vo
 function Transcript({ m, segs, live, onClose, reload, speakerName }: { m: Meeting; segs: Segment[]; live: boolean; onClose: () => void; reload: () => void; speakerName: (s: string) => string }) {
   const [q, setQ] = useState("");
   const [rename, setRename] = useState<{ speaker: string; name: string } | null>(null);
+  const [settings] = useSettings();
+  const suggest = settings?.speaker_suggestions ?? true;
+  const names: Record<string, string> = (() => {
+    try {
+      return JSON.parse(m.speakerNames || "{}");
+    } catch {
+      return {};
+    }
+  })();
+  // Attendees by name (first part of "Name <email>"), not me.
+  const me = (settings?.name || "").trim().toLowerCase();
+  const people = m.attendees
+    .split(/[,;]/)
+    .map((a) => a.replace(/<[^>]*>/, "").trim() || a.trim().split("@")[0])
+    .filter((a) => a && a.toLowerCase() !== me);
   const [edit, setEdit] = useState<{ id: number; text: string } | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const shown = q ? segs.filter((s) => s.text.toLowerCase().includes(q.toLowerCase())) : segs;
   const speakers = Array.from(new Set(segs.map((s) => s.speaker)));
+  const others = speakers.filter((x) => x !== "Me" && x !== "You" && x !== (settings?.name || "Me") && !names[x]);
+  const oneOther: [string, string] | null = others.length === 1 && people.length === 1 && speakers.length <= 2 ? [others[0], people[0]] : null;
   const groups: Segment[][] = [];
   for (const s of shown) {
     const g = groups[groups.length - 1];
@@ -730,7 +747,7 @@ function Transcript({ m, segs, live, onClose, reload, speakerName }: { m: Meetin
                   value={rename.name}
                   placeholder={s}
                   onChange={(e) => setRename({ speaker: s, name: e.target.value })}
-                  onBlur={() => (api.renameSpeaker(m.id, s, rename.name).then(reload), setRename(null))}
+                  onBlur={() => setTimeout(() => (api.renameSpeaker(m.id, s, rename.name).then(reload), setRename(null)), 120)}
                   onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                 />
               ) : (
@@ -739,6 +756,29 @@ function Transcript({ m, segs, live, onClose, reload, speakerName }: { m: Meetin
                 </button>
               ),
             )}
+          </div>
+        )}
+        {/* Speaker name suggestions from the meeting's attendees (Settings › Speaker names). */}
+        {suggest && rename && people.filter((p) => !Object.values(names).includes(p)).length > 0 && (
+          <div className="speaker-suggest">
+            {people
+              .filter((p) => !Object.values(names).includes(p))
+              .slice(0, 6)
+              .map((p) => (
+                <button key={p} className="pill" onMouseDown={(e) => (e.preventDefault(), setRename({ speaker: rename.speaker, name: p }))}>
+                  {p}
+                </button>
+              ))}
+          </div>
+        )}
+        {suggest && !rename && oneOther && (
+          <div className="speaker-suggest">
+            <span className="muted small">
+              {oneOther[0]} is probably {oneOther[1]}.
+            </span>
+            <button className="pill" onClick={() => api.renameSpeaker(m.id, oneOther[0], oneOther[1]).then(reload)}>
+              Use name
+            </button>
           </div>
         )}
       </div>

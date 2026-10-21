@@ -43,6 +43,7 @@ export interface Settings {
   notion_page: string;
   hubspot_token: string;
   screen_snapshots: boolean;
+  speaker_suggestions: boolean;
   transcript_retention: string;
   theme: "system" | "light" | "dark";
   beta: boolean;
