@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Account, api, CalendarSrc, ModelsInfo, on, Provider } from "../api";
 import type { Go } from "./App";
-import { fmtBytes, Icon, Row, Section, toast, Toggle, useSettings, useTemplates } from "./ui";
+import { copy, fmtBytes, Icon, Row, Section, toast, Toggle, useSettings, useTemplates } from "./ui";
 import { DEFAULT_CONSENT } from "./consent";
 import Credit from "./Credit";
 
@@ -19,6 +19,7 @@ const NAV: [string, string][] = [
   ["calendar", "Calendar"],
   ["notifications", "Notifications"],
   ["consent", "Transparency"],
+  ["connectors", "Connectors"],
   ["ai", "AI models"],
   ["data", "Data & privacy"],
   ["account", "Account"],
@@ -26,6 +27,11 @@ const NAV: [string, string][] = [
 ];
 
 export default function SettingsPage({ go, section }: { go: Go; section?: string }) {
+  const [exe, setExe] = useState("");
+  useEffect(() => {
+    api.exePath().then(setExe).catch(() => {});
+  }, []);
+  const mcp = JSON.stringify({ mcpServers: { cereal: { command: exe || "cereal", args: ["--mcp"] } } }, null, 2);
   const [s, save] = useSettings();
   const [templates] = useTemplates();
   const [mics, setMics] = useState<string[]>([]);
@@ -280,6 +286,32 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
               </div>
             )}
           </div>
+        </Section>
+
+        <Section title="Connectors" id="connectors">
+          <div className="row col">
+            <div className="row-title">Use your notes in other AI apps (MCP)</div>
+            <div className="row-desc">
+              Claude Desktop, Cursor and other MCP apps can read and search your notes. Everything stays on this computer. Add this to the app's MCP settings (for Claude
+              Desktop: Settings › Developer › Edit config):
+            </div>
+            <pre className="code">{mcp}</pre>
+            <div>
+              <button className="btn" onClick={() => copy(mcp, "Copied")}>
+                {Icon.copy} Copy
+              </button>
+            </div>
+          </div>
+          <div className="row col">
+            <div className="row-title">Command line</div>
+            <div className="row-desc">For scripts: list, read and search notes from a terminal. Add --json for JSON.</div>
+            <pre className="code">{`cereal notes list
+cereal notes get <id>
+cereal notes transcript <id>
+cereal notes search <words>
+cereal folders list`}</pre>
+          </div>
+          <Row title="Slack and other apps" desc="Post a folder's new notes to Slack, Zapier, Make or n8n: open the folder and set its webhook." />
         </Section>
 
         <Section title="AI models" id="ai" aside={status ? <span className="muted small">{status}</span> : undefined}>

@@ -14,6 +14,7 @@ mod hub;
 mod library;
 mod library_cmds;
 mod logging;
+mod mcp;
 mod notes;
 mod process;
 mod recorder;
@@ -367,6 +368,12 @@ fn recover(st: &St) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--mcp") {
+        std::process::exit(mcp::serve());
+    }
+    if let Some(code) = mcp::cli(&args) {
+        std::process::exit(code);
+    }
     if let Some(code) = cli::run(&args) {
         std::process::exit(code);
     }
@@ -488,6 +495,7 @@ pub fn run() {
             commands::sync_status,
             commands::pill_click,
             commands::still_here,
+            commands::exe_path,
             commands::use_version,
             commands::quick_hide,
             commands::pill_wide,

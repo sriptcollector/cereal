@@ -414,6 +414,12 @@ pub fn use_version(st: State<St>, id: String, index: usize) -> R<()> {
     Ok(())
 }
 
+/// Where Cereal is installed (for the MCP config other apps need).
+#[tauri::command]
+pub fn exe_path() -> String {
+    std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_default()
+}
+
 /// "Keep going" on the Still there? card.
 #[tauri::command]
 pub fn still_here(st: State<St>) {

@@ -326,6 +326,7 @@ export const api = {
   syncStatus: () => invoke<[boolean, boolean]>("sync_status"),
   pillClick: () => invoke<void>("pill_click"),
   stillHere: () => invoke<void>("still_here"),
+  exePath: () => invoke<string>("exe_path"),
   useVersion: (id: string, index: number) => invoke<void>("use_version", { id, index }),
   quickHide: () => invoke<void>("quick_hide"),
   pillWide: (wide: boolean) => invoke<void>("pill_wide", { wide }),
