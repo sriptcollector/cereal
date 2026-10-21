@@ -27,9 +27,12 @@ async function boot() {
     return;
   }
   const { default: App } = await import("./app/App");
+  const { default: ErrorBoundary } = await import("./app/ErrorBoundary");
   root.render(
     <React.StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>,
   );
   // Show the window only after the first paint, so it never flashes white.

@@ -61,7 +61,9 @@ export function useChat(meetingId: string | null) {
 
 export function Thread({ chat }: { chat: ReturnType<typeof useChat> }) {
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [chat.msgs.length, chat.streaming]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [chat.msgs.length, chat.streaming]);
   return (
     <div className="thread">
       {chat.msgs.map((m) => (

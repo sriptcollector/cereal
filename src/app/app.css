@@ -1697,3 +1697,17 @@ h1 {
     color: #111;
   }
 }
+
+.crash {
+  padding: 60px;
+  max-width: 720px;
+}
+.crash pre {
+  white-space: pre-wrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
