@@ -22,7 +22,9 @@ urlencoding = "2"
 toolbay-engine = { path = "../crates/toolbay-engine" }
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
-tauri-plugin-single-instance = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
+tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
@@ -53,6 +55,12 @@ windows = { version = "0.58", features = [
   "Win32_System_ProcessStatus",
   "Win32_UI_WindowsAndMessaging",
   "Win32_Media_Audio",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
+  "Win32_UI_Shell_PropertiesSystem",
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]

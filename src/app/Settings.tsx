@@ -111,6 +111,14 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
             <div className="row-desc">A sentence or two that helps the notes (your company, your team, what you care about).</div>
             <textarea rows={3} value={s.about} onChange={(e) => save({ about: e.target.value })} placeholder="I run sales at a 20-person design agency. Clients are mostly SaaS startups." />
           </div>
+          <Row title="Company name">
+            <input value={s.company_name} placeholder="e.g. Acme" onChange={(e) => save({ company_name: e.target.value })} />
+          </Row>
+          <div className="row col">
+            <div className="row-title">About your company</div>
+            <div className="row-desc">What it does and who its customers are. Helps the notes get names and context right.</div>
+            <textarea rows={2} value={s.company_about} onChange={(e) => save({ company_about: e.target.value })} placeholder="Design agency for SaaS startups, 20 people." />
+          </div>
         </Section>
 
         <Section title="Preferences" id="preferences">
@@ -129,6 +137,15 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
           </Row>
           <Row title="Sounds" desc="A short chime when notes start, pause, resume and stop.">
             <Toggle on={s.sounds} onChange={(v) => save({ sounds: v })} />
+          </Row>
+          <Row title="Quick chat (Alt+Space)" desc="Ask about your meetings from anywhere. Takes effect after restarting Cereal.">
+            <Toggle on={s.quick_chat} onChange={(v) => save({ quick_chat: v })} />
+          </Row>
+          <Row title="Enter key in chat">
+            <select value={s.chat_enter} onChange={(e) => save({ chat_enter: e.target.value })}>
+              <option value="send">Sends the message (Shift+Enter for a new line)</option>
+              <option value="newline">Adds a new line (Ctrl+Enter sends)</option>
+            </select>
           </Row>
           <Row title="Move Cereal beside the call" desc="When you join a meeting from Cereal, the note opens next to the call window.">
             <Toggle on={s.reposition} onChange={(v) => save({ reposition: v })} />
@@ -224,6 +241,9 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
               </button>
             </div>
           </div>
+          <Row title="Show events with no participants" desc="In Coming up: also your own blocks and reminders.">
+            <Toggle on={s.show_solo_events} onChange={(v) => save({ show_solo_events: v })} />
+          </Row>
           <Row title="Remind me a minute before meetings" desc="For calendar meetings with other people that you haven't declined.">
             <Toggle on={s.calendar_popups} onChange={(v) => save({ calendar_popups: v })} />
           </Row>

@@ -44,6 +44,15 @@ pub struct Settings {
     /// The floating indicator while recording when Cereal isn't in front. Automatic
     /// recordings always show it (never record silently).
     pub show_indicator: bool,
+    /// Alt+Space opens a small ask box from anywhere.
+    pub quick_chat: bool,
+    /// Enter sends a chat message ("send") or adds a line ("newline").
+    pub chat_enter: String,
+    /// Show calendar events that have no other people in "Coming up".
+    pub show_solo_events: bool,
+    /// About your company (helps the notes AI).
+    pub company_name: String,
+    pub company_about: String,
 
     // ---- profile (improves notes) ----
     pub job_title: String,
@@ -109,6 +118,11 @@ impl Default for Settings {
             sync_enabled: true,
             sounds: true,
             show_indicator: true,
+            quick_chat: true,
+            chat_enter: "send".into(),
+            show_solo_events: true,
+            company_name: String::new(),
+            company_about: String::new(),
             job_title: String::new(),
             about: String::new(),
             role: String::new(),
@@ -151,6 +165,10 @@ pub struct Synced {
     pub keep_audio: String,
     pub job_title: String,
     pub about: String,
+    #[serde(default)]
+    pub company_name: String,
+    #[serde(default)]
+    pub company_about: String,
     pub role: String,
     pub vocabulary: Vec<String>,
     pub summary_language: String,
@@ -176,6 +194,8 @@ impl Settings {
             keep_audio: self.keep_audio.clone(),
             job_title: self.job_title.clone(),
             about: self.about.clone(),
+            company_name: self.company_name.clone(),
+            company_about: self.company_about.clone(),
             role: self.role.clone(),
             vocabulary: self.vocabulary.clone(),
             summary_language: self.summary_language.clone(),
@@ -208,6 +228,8 @@ impl Settings {
             self.keep_audio = s.keep_audio.clone();
         }
         self.job_title = s.job_title.clone();
+        self.company_name = s.company_name.clone();
+        self.company_about = s.company_about.clone();
         self.about = s.about.clone();
         self.role = s.role.clone();
         self.vocabulary = s.vocabulary.clone();

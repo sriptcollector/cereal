@@ -17,7 +17,10 @@ mod logging;
 mod notes;
 mod process;
 mod recorder;
+mod quick;
 mod screens;
+#[cfg(windows)]
+mod jumplist;
 mod settings;
 mod sounds;
 mod state;
@@ -270,17 +273,28 @@ fn tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let st = app.state::<St>();
     let rec = st.session.lock().is_some();
     let open = MenuItem::with_id(app, "open", "Open Cereal", true, None::<&str>)?;
-    let next = calendar::next_event().map(|e| {
-        let t = chrono::DateTime::parse_from_rfc3339(&e.start).map(|d| d.with_timezone(&chrono::Local).format("%-I:%M %p").to_string()).unwrap_or_default();
-        format!("Next: {} at {}", e.title.chars().take(40).collect::<String>(), t)
-    });
     let toggle = MenuItem::with_id(app, "toggle", if rec { "Stop taking notes" } else { "Start taking notes" }, true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
+    let restart = MenuItem::with_id(app, "restart", "Restart Cereal", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Cereal", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &toggle, &PredefinedMenuItem::separator(app)?, &settings, &PredefinedMenuItem::separator(app)?, &quit])?;
-    if let Some(n) = next {
-        menu.insert(&MenuItem::with_id(app, "next", n, false, None::<&str>)?, 0)?;
-        menu.insert(&PredefinedMenuItem::separator(app)?, 1)?;
+    let menu = Menu::with_items(app, &[&open, &toggle, &PredefinedMenuItem::separator(app)?, &settings, &PredefinedMenuItem::separator(app)?, &restart, &quit])?;
+    // Today's meetings that haven't ended (up to 8, like Granola); click opens the note.
+    let today = chrono::Local::now().date_naive();
+    let now = chrono::Utc::now().to_rfc3339();
+    let todays: Vec<calendar::Event> = calendar::events()
+        .into_iter()
+        .filter(|e| !e.all_day && !e.declined && e.end > now)
+        .filter(|e| chrono::DateTime::parse_from_rfc3339(&e.start).map(|d| d.with_timezone(&chrono::Local).date_naive() == today).unwrap_or(false))
+        .take(8)
+        .collect();
+    if !todays.is_empty() {
+        menu.insert(&MenuItem::with_id(app, "today", "Today", false, None::<&str>)?, 0)?;
+        for (i, e) in todays.iter().enumerate() {
+            let t = chrono::DateTime::parse_from_rfc3339(&e.start).map(|d| d.with_timezone(&chrono::Local).format("%-I:%M %p").to_string()).unwrap_or_default();
+            let label = format!("{t}   {}", e.title.chars().take(40).collect::<String>());
+            menu.insert(&MenuItem::with_id(app, format!("ev:{}", e.id), label, true, None::<&str>)?, i + 1)?;
+        }
+        menu.insert(&PredefinedMenuItem::separator(app)?, todays.len() + 1)?;
     }
     Ok(menu)
 }
@@ -292,7 +306,18 @@ pub fn refresh_tray(st: &St) {
         if let (Some(tray), Ok(menu)) = (app2.tray_by_id("notes"), tray_menu(&app2)) {
             let rec = app2.state::<St>().session.lock().is_some();
             let _ = tray.set_menu(Some(menu));
-            let _ = tray.set_tooltip(Some(if rec { "Cereal: taking notes" } else { "Cereal" }));
+            // Like Granola's menu-bar title: the next meeting and how soon.
+            let tip = if rec {
+                "Cereal: taking notes".to_string()
+            } else {
+                calendar::next_event()
+                    .and_then(|e| {
+                        let mins = (chrono::DateTime::parse_from_rfc3339(&e.start).ok()?.with_timezone(&chrono::Utc) - chrono::Utc::now()).num_minutes();
+                        (mins < 24 * 60).then(|| format!("Cereal · {} in {}", e.title.chars().take(40).collect::<String>(), if mins < 60 { format!("{} min", mins.max(1)) } else { format!("{} h", mins / 60) }))
+                    })
+                    .unwrap_or_else(|| "Cereal".to_string())
+            };
+            let _ = tray.set_tooltip(Some(tip));
         }
         update_pill(&app2);
         hub::write_state(&app2);
@@ -305,6 +330,13 @@ fn on_menu(app: &AppHandle, id: &str) {
         "open" => show_hub(app, None),
         "settings" => show_hub(app, Some("settings")),
         "quit" => hub::quit(app),
+        "restart" => app.restart(),
+        id if id.starts_with("ev:") => {
+            let ev = id.trim_start_matches("ev:").to_string();
+            if let Ok(m) = library_cmds::note_for_event(app.state::<St>(), ev) {
+                show_hub(app, Some(&format!("meeting:{}", m.id)));
+            }
+        }
         "toggle" => {
             if st.session.lock().is_some() {
                 recorder::stop(&st);
@@ -340,6 +372,8 @@ pub fn run() {
     }
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| hub::handle_args(app, &args)))
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -374,6 +408,21 @@ pub fn run() {
                 use tauri_plugin_autostart::ManagerExt;
                 let _ = handle.autolaunch().enable();
             }
+            // cereal:// links (Windows registers the scheme for this user).
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                #[cfg(windows)]
+                let _ = handle.deep_link().register_all();
+                let h = handle.clone();
+                handle.deep_link().on_open_url(move |ev| {
+                    for u in ev.urls() {
+                        hub::open_url(&h, u.as_str());
+                    }
+                });
+            }
+            #[cfg(windows)]
+            jumplist::set();
+            quick::register(&handle, &st);
             engine::auto_setup(&st);
             detect::start(st.clone());
             calendar::start(st.clone());
@@ -381,7 +430,7 @@ pub fn run() {
             recover(&st);
             // `--start` / `--open <page>` on first launch too (not only when forwarded).
             let first: Vec<String> = std::env::args().collect();
-            if first.iter().any(|a| a == "--start" || a == "--open") {
+            if first.iter().any(|a| a == "--start" || a == "--open" || a.starts_with("cereal://") || a.starts_with("--task=")) {
                 let h = handle.clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(Duration::from_millis(1500));
@@ -439,6 +488,7 @@ pub fn run() {
             commands::sync_status,
             commands::pill_click,
             commands::still_here,
+            commands::quick_hide,
             commands::pill_wide,
             commands::screenshot,
             commands::current_event,

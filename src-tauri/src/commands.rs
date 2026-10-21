@@ -388,6 +388,14 @@ pub fn screenshot(st: State<St>) -> R<()> {
     crate::screens::screenshot_into_note(&st).map(|_| ()).map_err(e)
 }
 
+/// Hides the Alt+Space ask box.
+#[tauri::command]
+pub fn quick_hide(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("quick") {
+        let _ = w.hide();
+    }
+}
+
 /// "Keep going" on the Still there? card.
 #[tauri::command]
 pub fn still_here(st: State<St>) {

@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window, the meeting popup and the recording pill",
-  "windows": ["main", "popup", "pill"],
+  "windows": ["main", "popup", "pill", "quick"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

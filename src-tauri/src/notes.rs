@@ -292,6 +292,10 @@ pub async fn enhance(st: &St, id: &str, template_id: Option<String>) -> Result<S
             let ab = if s.about.trim().is_empty() { String::new() } else { format!(". {}", s.about.trim()) };
             p.push_str(&format!("ABOUT THE USER: {me}{jt}{ab}\n"));
         }
+        if !s.company_name.trim().is_empty() || !s.company_about.trim().is_empty() {
+            p.push_str(&format!("THE USER'S COMPANY: {} {}
+", s.company_name.trim(), s.company_about.trim()));
+        }
         if !s.vocabulary.is_empty() {
             p.push_str(&format!("SPELL THESE EXACTLY: {}\n", s.vocabulary.join(", ")));
         }

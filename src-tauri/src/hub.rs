@@ -15,7 +15,17 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 pub fn handle_args(app: &AppHandle, args: &[String]) {
-    if args.iter().any(|a| a == "--quit") {
+    if let Some(u) = args.iter().find(|a| a.starts_with("cereal://")) {
+        open_url(app, u);
+    } else if let Some(t) = args.iter().find_map(|a| a.strip_prefix("--task=")) {
+        // Jump-list tasks (Windows taskbar right-click).
+        match t {
+            "new-note" => handle_args(app, &["--start".to_string()]),
+            "settings" => crate::show_hub(app, Some("settings")),
+            "restart" => app.restart(),
+            _ => quit(app),
+        }
+    } else if args.iter().any(|a| a == "--quit") {
         quit(app);
     } else if args.iter().any(|a| a == "--hide") {
         if let Some(w) = app.get_webview_window("main") {
@@ -40,6 +50,34 @@ pub fn handle_args(app: &AppHandle, args: &[String]) {
         crate::show_hub(app, args.get(i + 1).map(|s| s.as_str()));
     } else {
         crate::show_hub(app, None);
+    }
+}
+
+/// cereal:// links: new-note, open, settings, ask?q=…, meeting/<id>, folder/<id>.
+pub fn open_url(app: &AppHandle, url: &str) {
+    // The same link can arrive twice (forwarded arguments and the link event).
+    static LAST: std::sync::Mutex<Option<(String, std::time::Instant)>> = std::sync::Mutex::new(None);
+    {
+        let mut last = LAST.lock().unwrap();
+        if last.as_ref().map(|(u, t)| u == url && t.elapsed() < std::time::Duration::from_secs(2)).unwrap_or(false) {
+            return;
+        }
+        *last = Some((url.to_string(), std::time::Instant::now()));
+    }
+    let Ok(u) = url::Url::parse(url) else { return };
+    let host = u.host_str().unwrap_or("");
+    let rest = u.path().trim_matches('/');
+    log::info!("link: {host}/{rest}");
+    match host {
+        "new-note" | "start" => handle_args(app, &["--start".to_string()]),
+        "settings" => crate::show_hub(app, Some("settings")),
+        "ask" => {
+            let q = u.query_pairs().find(|(k, _)| k == "q").map(|(_, v)| v.into_owned()).unwrap_or_default();
+            crate::show_hub(app, Some(&format!("ask:{q}")));
+        }
+        "meeting" | "note" if !rest.is_empty() => crate::show_hub(app, Some(&format!("meeting:{rest}"))),
+        "folder" if !rest.is_empty() => crate::show_hub(app, Some(&format!("folder:{rest}"))),
+        _ => crate::show_hub(app, None),
     }
 }
 

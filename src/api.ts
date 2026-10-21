@@ -34,6 +34,11 @@ export interface Settings {
   reposition: boolean;
   sounds: boolean;
   show_indicator: boolean;
+  quick_chat: boolean;
+  chat_enter: string;
+  show_solo_events: boolean;
+  company_name: string;
+  company_about: string;
   transcript_retention: string;
   theme: "system" | "light" | "dark";
   beta: boolean;
@@ -318,6 +323,7 @@ export const api = {
   syncStatus: () => invoke<[boolean, boolean]>("sync_status"),
   pillClick: () => invoke<void>("pill_click"),
   stillHere: () => invoke<void>("still_here"),
+  quickHide: () => invoke<void>("quick_hide"),
   pillWide: (wide: boolean) => invoke<void>("pill_wide", { wide }),
   screenshot: () => invoke<void>("screenshot"),
   currentEvent: () => invoke<CalEvent | null>("current_event"),

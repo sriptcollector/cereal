@@ -82,10 +82,11 @@ export function NotesByDay({ meetings, go, selectable, selected, setSelected }: 
 function ComingUp({ go }: { go: Go }) {
   const [events, setEvents] = useState<CalEvent[] | null>(null);
   const [hasCal, setHasCal] = useState(false);
+  const [showSolo, setShowSolo] = useState(true);
   useEffect(() => {
     const load = () => {
       api.events().then(setEvents);
-      api.getSettings().then((s) => setHasCal(s.calendars.some((c) => c.enabled)));
+      api.getSettings().then((s) => (setHasCal(s.calendars.some((c) => c.enabled)), setShowSolo(s.show_solo_events)));
     };
     load();
     return on("calendar-changed", load);
@@ -105,7 +106,8 @@ function ComingUp({ go }: { go: Go }) {
     );
   }
   const now = Date.now();
-  const upcoming = (events ?? []).filter((e) => new Date(e.end).getTime() > now && !e.allDay).slice(0, 12);
+  // Granola hides events with no other people unless "Show events with no participants" is on.
+  const upcoming = (events ?? []).filter((e) => new Date(e.end).getTime() > now && !e.allDay && !e.declined && (showSolo || e.attendees.length > 0 || !!e.link)).slice(0, 12);
   const days: [Date, CalEvent[]][] = [];
   for (const e of upcoming) {
     const d = new Date(e.start);

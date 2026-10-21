@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, Hit, on, RecState } from "../api";
 import { Icon, LOGO, Modal, toast, useFolders, useSettings, useTheme, dayLabel } from "./ui";
 import { fmtDur } from "./md";
@@ -28,7 +28,14 @@ export type Go = (r: Route) => void;
 export default function App() {
   const [settings, , reload] = useSettings();
   useTheme(settings?.theme);
-  const [route, setRoute] = useState<Route>({ page: "home" });
+  const [route, setRouteRaw] = useState<Route>({ page: "home" });
+  // Back (Ctrl+[) walks this history.
+  const back = useRef<Route[]>([]);
+  const setRoute = (r: Route) =>
+    setRouteRaw((cur) => {
+      if (JSON.stringify(cur) !== JSON.stringify(r)) back.current = [...back.current, cur].slice(-50);
+      return r;
+    });
   const [version, setVersion] = useState("");
   const [rec, setRec] = useState<RecState | null>(null);
   const [folders] = useFolders();
@@ -50,6 +57,7 @@ export default function App() {
         const [, fid, tab] = p.split(":");
         setRoute({ page: "folder", id: fid, tab });
       } else if (p === "settings") setRoute({ page: "settings" });
+      else if (p.startsWith("ask:")) setRoute({ page: "chat", question: p.slice(4) });
       else if (p === "chat" || p === "ask") setRoute({ page: "chat" });
       else setRoute({ page: p as "home" });
     });
@@ -67,9 +75,16 @@ export default function App() {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const key = e.key.toLowerCase();
-      if (key === "k") {
+      if (key === "k" || key === "/") {
         e.preventDefault();
         setPalette(true);
+      } else if (key === ",") {
+        e.preventDefault();
+        setRoute({ page: "settings" });
+      } else if (key === "[") {
+        e.preventDefault();
+        const prev = back.current.pop();
+        if (prev) setRouteRaw(prev);
       } else if (key === "j") {
         e.preventDefault();
         const box = document.querySelector<HTMLTextAreaElement>(".askbar textarea, .askcard textarea");

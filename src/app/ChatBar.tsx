@@ -3,6 +3,14 @@ import { api, ChatMsg, on, Recipe, Source } from "../api";
 import { copy, Icon, toast, useRecipes } from "./ui";
 import { Markdown } from "./md";
 
+// Settings › Chat: Enter sends (default) or Ctrl+Enter sends and Enter adds a line.
+let enterSends = true;
+const loadEnter = () => api.getSettings().then((x) => (enterSends = x.chat_enter !== "newline")).catch(() => {});
+loadEnter();
+on("settings-changed", loadEnter);
+const sendKey = (e: { key: string; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) =>
+  e.key === "Enter" && (enterSends ? !e.shiftKey : e.ctrlKey || e.metaKey);
+
 /** A chat thread: messages, streaming answer, sources. */
 export function useThread(scope: string, scopeId: string, initialThread?: string | null) {
   const [threadId, setThreadId] = useState<string | null>(initialThread ?? null);
@@ -181,7 +189,7 @@ export default function AskBar({
     if (list.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
       e.preventDefault();
       setSel((s) => (s + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length);
-    } else if (e.key === "Enter" && !e.shiftKey) {
+    } else if (sendKey(e)) {
       e.preventDefault();
       if (list.length) send(list[Math.min(sel, list.length - 1)].prompt);
       else send(v);
@@ -238,7 +246,7 @@ export function AskCard({ placeholder, onSubmit, kind, chips, compact }: { place
             placeholder={placeholder}
             onChange={(e) => (setV(e.target.value), setSel(0))}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (sendKey(e)) {
                 e.preventDefault();
                 if (list.length) send(list[Math.min(sel, list.length - 1)].prompt);
                 else send(v);
@@ -277,7 +285,7 @@ export function AskCard({ placeholder, onSubmit, kind, chips, compact }: { place
             if (list.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
               e.preventDefault();
               setSel((s) => (s + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length);
-            } else if (e.key === "Enter" && !e.shiftKey) {
+            } else if (sendKey(e)) {
               e.preventDefault();
               if (list.length) send(list[Math.min(sel, list.length - 1)].prompt);
               else send(v);

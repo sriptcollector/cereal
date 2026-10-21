@@ -17,6 +17,12 @@ async function boot() {
     root.render(<Popup />);
     return;
   }
+  if (view === "quick") {
+    document.body.classList.add("overlay");
+    const { default: Quick } = await import("./app/Quick");
+    root.render(<Quick />);
+    return;
+  }
   if (view === "pill") {
     document.body.classList.add("overlay");
     const { default: Pill } = await import("./app/Pill");

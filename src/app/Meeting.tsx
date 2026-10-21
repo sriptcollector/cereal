@@ -39,8 +39,17 @@ export function notesMarkdown(m: Meeting, segs: Segment[], withTranscript: boole
   return md;
 }
 
+/** Finds text in the page, wrapping around (Chromium's window.find). */
+function findNext(q: string, backwards: boolean) {
+  if (!q) return;
+  const w = window as unknown as { find?: (s: string, cs: boolean, back: boolean, wrap: boolean) => boolean };
+  if (w.find && !w.find(q, false, backwards, true)) toast("Not found");
+}
+
 export default function MeetingPage({ id, go, panel }: { id: string; go: Go; panel?: string }) {
   const [m, setM] = useState<Meeting | null>(null);
+  const [find, setFind] = useState<string | null>(null);
+  const keys = useRef<((e: KeyboardEvent) => void) | null>(null);
   const [segs, setSegs] = useState<Segment[]>([]);
   const [rec, setRec] = useState<RecState | null>(null);
   const [settings] = useSettings();
@@ -130,6 +139,11 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
   const speakers = useMemo(() => Array.from(new Set(segs.map((s) => s.speaker))), [segs]);
   const folder = folders.find((f) => f.id === m?.folder);
 
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => keys.current?.(e);
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, []);
   if (!m || !settings) return <div className="page" />;
 
   const processing = m.status === "processing";
@@ -143,6 +157,8 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
     }
   };
   const regenerate = async (tid?: string) => {
+    // Like Granola: rewriting replaces edits made to the AI notes.
+    if (m.enhanced && !tid && !window.confirm("Rewrite the notes? Changes you made to the AI notes will be replaced.")) return;
     setStreamNotes("");
     setView("ai");
     await api.regenerate(id, tid ?? m.templateId);
@@ -176,11 +192,52 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
     }
   };
 
+  // Ctrl+F finds in this note (Ctrl+G / Enter next, Shift for previous); Ctrl+Shift+G rewrites.
+  keys.current = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
+      if (key === "f") {
+        e.preventDefault();
+        setFind((f) => (f === null ? "" : f));
+        setTimeout(() => document.querySelector<HTMLInputElement>(".findbar input")?.select(), 0);
+      } else if (key === "g" && e.shiftKey) {
+        e.preventDefault();
+        if (canWrite) regenerate();
+      } else if (key === "g" && find) {
+        e.preventDefault();
+        findNext(find, false);
+      }
+  };
+
   const aiText = streamNotes ? streamNotes.replace(/^\s*Title:.*\n?/i, "") : m.enhanced;
   const showAi = view === "ai" && (m.enhanced || streamNotes);
 
   return (
     <div className={`meeting ${showTx ? "with-tx" : ""}`}>
+      {find !== null && (
+        <div className="findbar">
+          <input
+            autoFocus
+            placeholder="Find in note"
+            value={find}
+            onChange={(e) => setFind(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") findNext(find, e.shiftKey);
+              if (e.key === "Escape") setFind(null);
+            }}
+          />
+          <button className="icon-btn" title="Previous (Shift+Enter)" onClick={() => findNext(find, true)}>
+            ↑
+          </button>
+          <button className="icon-btn" title="Next (Enter)" onClick={() => findNext(find, false)}>
+            ↓
+          </button>
+          <button className="icon-btn" title="Close (Esc)" onClick={() => setFind(null)}>
+            ✕
+          </button>
+        </div>
+      )}
       <div className="meeting-main">
         <div className="topbar">
           <div className="crumb">
