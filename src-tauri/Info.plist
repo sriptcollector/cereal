@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Toolbay Notes records your side of a meeting only while you are taking notes, and transcribes it on this Mac.</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Toolbay Notes records the other people in your meeting (your computer's sound) only while you are taking notes, and transcribes it on this Mac.</string>
+  <key>NSScreenCaptureUsageDescription</key>
+  <string>macOS asks for this so Toolbay Notes can hear your computer's sound during a meeting. It never records your screen.</string>
+  <key>LSUIElement</key>
+  <false/>
+</dict>
+</plist>

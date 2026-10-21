@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c1c1c"/>
+      <stop offset="1" stop-color="#0c0c0c"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="224" fill="url(#bg)" stroke="#2f2f2f" stroke-width="8"/>
+  <!-- note page -->
+  <rect x="262" y="214" width="500" height="596" rx="72" fill="#fafafa"/>
+  <rect x="352" y="334" width="320" height="40" rx="20" fill="#0a0a0a"/>
+  <rect x="352" y="424" width="250" height="40" rx="20" fill="#0a0a0a"/>
+  <!-- voice line: the meeting being heard -->
+  <g fill="#8b6dff">
+    <rect x="352" y="560" width="40" height="80" rx="20"/>
+    <rect x="422" y="520" width="40" height="160" rx="20"/>
+    <rect x="492" y="548" width="40" height="104" rx="20"/>
+    <rect x="562" y="500" width="40" height="200" rx="20"/>
+    <rect x="632" y="572" width="40" height="56" rx="20"/>
+  </g>
+</svg>
