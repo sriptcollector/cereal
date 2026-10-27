@@ -1,6 +1,6 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { api, Folder, on, Recipe, Settings, Template } from "../api";
-import logo from "../assets/logo.svg";
+import logo from "../assets/logo-pixel.png";
 
 export const LOGO = logo;
 
