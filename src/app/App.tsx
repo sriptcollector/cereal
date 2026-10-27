@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, Hit, on, RecState } from "../api";
-import { Icon, LOGO, Modal, toast, useFolders, useSettings, useTheme, dayLabel } from "./ui";
+import { Icon, LogoImg, Modal, toast, useFolders, useSettings, useTheme, dayLabel } from "./ui";
 import { fmtDur } from "./md";
 import Onboarding from "./Onboarding";
 import Home from "./Home";
@@ -122,7 +122,7 @@ export default function App() {
       <aside className="side">
         <div className="side-top">
           <div className="side-brand">
-            <img src={LOGO} alt="" />
+            <LogoImg alt="" />
             Cereal
           </div>
           <div className="spacer" />

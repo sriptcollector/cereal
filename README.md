@@ -2,7 +2,8 @@
 
 <h1 align="center">Cereal</h1>
 
-<p align="center"><b>The free, local AI notepad for your meetings. No bot joins your call.</b><br>
+<p align="center"><b>First Wispr Flow, then Obsidian. Now we're making Granola free. Stop paying for dumb shit.</b><br>
+The free, local AI notepad for your meetings. No bot joins your call.<br>
 Jot a few words during the meeting. When it ends, the AI on your computer turns them and the transcript<br>
 into clean notes with decisions and action items. No account. No limits. Nothing leaves your computer.</p>
 

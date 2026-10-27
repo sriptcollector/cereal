@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, Settings } from "../api";
-import { LOGO, useTheme } from "./ui";
+import { LogoImg, useTheme } from "./ui";
 
 /** Alt+Space: ask about your meetings from anywhere. */
 export default function Quick() {
@@ -24,7 +24,7 @@ export default function Quick() {
   };
   return (
     <div className="quick">
-      <img src={LOGO} alt="" />
+      <LogoImg alt="" />
       <input
         ref={box}
         placeholder="Ask anything about your meetings"

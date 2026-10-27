@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, CalEvent, Call, on, Settings } from "../api";
-import { copy, Icon, LOGO, useTheme } from "./ui";
+import { copy, Icon, LogoImg, useTheme } from "./ui";
 
 type Mode = { kind: "ask"; call: Call } | { kind: "auto"; app: string; meetingId: string; consent: boolean } | { kind: "event"; event: CalEvent } | { kind: "still" } | { kind: "corner" };
 
@@ -55,7 +55,7 @@ export default function Popup() {
     return (
       <div className="popup adhoc">
         <div className="popup-head">
-          <img src={LOGO} alt="" />
+          <LogoImg alt="" />
           <div style={{ minWidth: 0 }}>
             <div className="popup-title">New note</div>
             <div className="popup-sub">Start taking notes now?</div>
@@ -87,7 +87,7 @@ export default function Popup() {
     return (
       <div className="popup adhoc">
         <div className="popup-head">
-          <img src={LOGO} alt="" />
+          <LogoImg alt="" />
           <div style={{ minWidth: 0 }}>
             <div className="popup-title">Still there?</div>
             <div className="popup-sub">Nobody has spoken for a while. Cereal stops in a minute.</div>
@@ -109,7 +109,7 @@ export default function Popup() {
     return (
       <div className="popup adhoc">
         <div className="popup-head">
-          <img src={LOGO} alt="" />
+          <LogoImg alt="" />
           <div style={{ minWidth: 0 }}>
             <div className="popup-title">
               <span className="rec-dot" style={{ display: "inline-block", marginRight: 6 }} />
@@ -139,7 +139,7 @@ export default function Popup() {
     return (
       <div className="popup">
         <div className="popup-head">
-          <img src={LOGO} alt="" />
+          <LogoImg alt="" />
           <div style={{ minWidth: 0 }}>
             <div className="popup-title">{e.title}</div>
             <div className="popup-sub">
@@ -172,7 +172,7 @@ export default function Popup() {
   return (
     <div className="popup adhoc">
       <div className="popup-head">
-        <img src={LOGO} alt="" />
+        <LogoImg alt="" />
         <div style={{ minWidth: 0 }}>
           <div className="popup-title">{ev ? ev.title : label}</div>
           <div className="popup-sub">{ev ? `${hm(ev.start)}–${hm(ev.end)} · ${app}` : `${app} is using your microphone`}</div>

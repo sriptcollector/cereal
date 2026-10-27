@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ModelsInfo, Settings } from "../api";
-import { Icon, LOGO, useSettings, useTheme } from "./ui";
+import { Icon, LogoImg, useSettings, useTheme } from "./ui";
 import Credit from "./Credit";
 
 type Step = "welcome" | "you" | "calendar" | "audio" | "meetings" | "ready";
@@ -60,7 +60,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
         {step === "welcome" && (
           <>
-            <img className="ob-logo" src={LOGO} alt="Cereal" />
+            <LogoImg className="ob-logo" alt="Cereal" />
             <h1 className="h-serif">The notepad for your meetings</h1>
             <p className="lead">Cereal listens to your calls in Zoom, Google Meet, Teams, Slack or anything else, with no bot joining. Jot a few words; when the call ends, the AI on your computer writes clean notes.</p>
             <ul className="ob-points">

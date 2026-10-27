@@ -1,8 +1,23 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { api, Folder, on, Recipe, Settings, Template } from "../api";
+import { invoke } from "@tauri-apps/api/core";
 import logo from "../assets/logo-pixel.png";
+import logoLight from "../assets/logo-pixel-light.png";
 
 export const LOGO = logo;
+
+const isDark = () => document.documentElement.dataset.theme !== "light";
+
+/** Cereal's logo in the current theme's version (light tile in light mode). */
+export function LogoImg(props: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const [dark, setDark] = useState(isDark);
+  useEffect(() => {
+    const mo = new MutationObserver(() => setDark(isDark()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, []);
+  return <img {...props} src={dark ? logo : logoLight} style={{ imageRendering: "pixelated", ...props.style }} />;
+}
 
 /** Shared settings state with optimistic save. */
 export function useSettings(): [Settings | null, (patch: Partial<Settings>) => Promise<void>, () => void] {
@@ -69,6 +84,8 @@ export function useTheme(theme: string | undefined) {
     const apply = () => {
       const dark = theme === "dark" || ((!theme || theme === "system") && window.matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.dataset.theme = dark ? "dark" : "light";
+      // The Dock / taskbar icon follows too.
+      invoke("set_app_icon", { dark }).catch(() => {});
     };
     apply();
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

@@ -1,6 +1,6 @@
 [package]
 name = "cereal"
-version = "0.4.1"
+version = "0.4.2"
 description = "Cereal: free, local, open-source AI meeting notes. No bot joins your call."
 authors = ["Orion Jones"]
 license = "MIT"
@@ -66,4 +66,7 @@ windows = { version = "0.58", features = [
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
 screencapturekit = "11"

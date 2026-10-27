@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "cereal"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -578,6 +578,9 @@ dependencies = [
  "image",
  "keyring",
  "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
  "once_cell",
  "parking_lot",
  "reqwest 0.12.28",
