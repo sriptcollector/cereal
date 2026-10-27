@@ -27,9 +27,9 @@ const manifest = {
   schema: 1,
   id: "cereal",
   name: "Cereal",
-  tagline: "Free, local AI meeting notes. No bot joins your call.",
+  tagline: "Granola, free. No bot joins your call.",
   description:
-    "Records your side and the other side of any call (Zoom, Google Meet, Teams, Slack) without a bot, transcribes it on your computer, tells speakers apart, and turns your rough notes into clean notes with decisions and action items. Search and chat across all your meetings. No account, no limits, no telemetry.",
+    "First Wispr Flow, then Obsidian. Now we're making Granola free. Stop paying for dumb shit. Records your side and the other side of any call (Zoom, Google Meet, Teams, Slack) without a bot, transcribes it on your computer, tells speakers apart, and turns your rough notes into clean notes with decisions and action items. Search and chat across all your meetings. No account, no limits, no telemetry.",
   version: v,
   repo: "sriptcollector/cereal",
   identifier: "ai.toolbay.cereal",
