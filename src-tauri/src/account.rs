@@ -1,4 +1,5 @@
-//! The person's Toolbay sign-in: the Toolbay app's token from the OS keychain (it
+//! The person's Toolbay sign-in: the Toolbay app's token (Windows Credential
+//! Manager, or a private file on macOS, never the macOS keychain) (it
 //! changes when they sign in or out there), or the one the hub passed at launch
 //! (TOOLBAY_TOKEN). Held in memory only, only ever sent to toolbay.ai.
 
@@ -10,12 +11,28 @@ pub const BASE: &str = "https://toolbay.ai";
 /// Cereal's slug in the toolbay.ai catalog.
 pub const SLUG: &str = "cereal";
 
+/// The Toolbay app's saved sign-in on this computer. Windows: Credential Manager
+/// (service "ai.toolbay.desktop", user "session"). macOS: the 0600 file
+/// `~/Library/Application Support/ai.toolbay.desktop/session` that the Toolbay
+/// app writes; the keychain is never touched on macOS (ad-hoc signed updates
+/// would make macOS ask for the login password every time).
+fn hub_token() -> Option<String> {
+    #[cfg(windows)]
+    {
+        keyring::Entry::new("ai.toolbay.desktop", "session").and_then(|e| e.get_password()).ok().map(|t| t.trim().to_string()).filter(|t| !t.is_empty())
+    }
+    #[cfg(not(windows))]
+    {
+        let home = std::env::var_os("HOME")?;
+        let p = std::path::PathBuf::from(home).join("Library/Application Support/ai.toolbay.desktop/session");
+        std::fs::read_to_string(p).ok().map(|t| t.trim().to_string()).filter(|t| !t.is_empty())
+    }
+}
+
 pub fn tokens() -> Vec<String> {
     let mut v = vec![];
-    if let Ok(t) = keyring::Entry::new("ai.toolbay.desktop", "session").and_then(|e| e.get_password()) {
-        if !t.is_empty() {
-            v.push(t);
-        }
+    if let Some(t) = hub_token() {
+        v.push(t);
     }
     if let Ok(t) = std::env::var("TOOLBAY_TOKEN") {
         if !t.is_empty() && !v.contains(&t) {

@@ -1,6 +1,6 @@
 [package]
 name = "cereal"
-version = "0.4.4"
+version = "0.4.5"
 description = "Cereal: free, local, open-source AI meeting notes. No bot joins your call."
 authors = ["Orion Jones"]
 license = "MIT"
@@ -44,9 +44,10 @@ tauri-plugin-dialog = "2"
 symphonia = { version = "0.5", default-features = false, features = ["mp3", "aac", "isomp4", "wav", "flac", "vorbis", "ogg", "pcm", "adpcm"] }
 base64 = "0.22"
 zip = { version = "2", default-features = false, features = ["deflate"] }
-keyring = { version = "3", features = ["windows-native", "apple-native"] }
 
 [target.'cfg(windows)'.dependencies]
+# The Toolbay app's sign-in (Credential Manager). Never used on macOS.
+keyring = { version = "3", features = ["windows-native"] }
 winreg = "0.52"
 windows = { version = "0.58", features = [
   "Win32_Foundation",
