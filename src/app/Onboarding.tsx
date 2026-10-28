@@ -64,7 +64,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             <h1 className="h-serif">The notepad for your meetings</h1>
             <p className="lead">Cereal listens to your calls in Zoom, Google Meet, Teams, Slack or anything else, with no bot joining. Jot a few words; when the call ends, the AI on your computer writes clean notes.</p>
             <ul className="ob-points">
-              <li>{Icon.shield} Everything stays on this computer. No account, no cloud, no tracking.</li>
+              <li>{Icon.shield} Your calls turn into notes on this computer. Nothing is sent anywhere unless you turn on sync, a cloud AI option or a connector. No tracking.</li>
               <li>{Icon.people} Knows who said what: you, and each of the other people.</li>
               <li>{Icon.sparkle} Free and open source. No limits.</li>
             </ul>
@@ -114,7 +114,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             <h1 className="h-serif">Connect your calendar</h1>
             <p className="lead">See what's coming up, get a nudge a minute before meetings, and have notes named with the people in them. Optional.</p>
             <p className="muted small">
-              Paste your calendar's private iCal address. Google Calendar: Settings › your calendar › “Secret address in iCal format”. Outlook: Settings › Calendar › Shared calendars › Publish › ICS link. It stays on this computer.
+              Paste your calendar's private iCal address. Google Calendar: Settings › your calendar › “Secret address in iCal format”. Outlook: Settings › Calendar › Shared calendars › Publish › ICS link. The address stays on this computer and is never synced.
             </p>
             <input style={{ width: "100%" }} value={cal} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" onChange={(e) => setCal(e.target.value)} />
             {calMsg && <p className="muted small">{calMsg}</p>}

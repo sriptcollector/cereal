@@ -5,7 +5,8 @@
 <p align="center"><b>First Wispr Flow, then Obsidian. Now we're making Granola free. Stop paying for dumb shit.</b><br>
 The free, local AI notepad for your meetings. No bot joins your call.<br>
 Jot a few words during the meeting. When it ends, the AI on your computer turns them and the transcript<br>
-into clean notes with decisions and action items. No account. No limits. Nothing leaves your computer.</p>
+into clean notes with decisions and action items. No account. No limits. Nothing is sent anywhere unless you turn on sync,<br>
+a cloud AI option or a connector.</p>
 
 <p align="center"><sub>Inspired by <img src="src/assets/inspired-by/granola.svg" height="12" alt="Granola"> Granola<br>
 Cereal is an independent open-source project and is not affiliated with or endorsed by Granola.</sub></p>
@@ -83,8 +84,13 @@ The full checklist against Granola is in [docs/FEATURES.md](docs/FEATURES.md).
 
 Audio, transcripts, notes and the search index live in your app data folder (`%APPDATA%\ai.toolbay.cereal` on Windows,
 `~/Library/Application Support/ai.toolbay.cereal` on Mac). Network use: downloading AI models, your calendar feed,
-Toolbay sync of settings/templates when signed in to the Toolbay app, feedback you choose to send, webhooks you set, and
+Toolbay sync only if you turn it on (off by default), feedback you choose to send, connectors and webhooks you set, and
 a cloud engine only if you add your own key.
+
+Sync sends your profile (name, job title, role, about you, company, vocabulary), consent note, recording and notes
+choices and custom templates to your Toolbay account on toolbay.ai. Toolbay's server can read this data; it is not
+end-to-end encrypted. Calendar (iCal) links, recordings, transcripts, notes and API keys are never synced. Turn sync off
+or delete the synced copy any time in Settings > Account.
 
 ## Build from source
 

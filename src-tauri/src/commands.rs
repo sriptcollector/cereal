@@ -18,10 +18,16 @@ pub fn get_settings(st: State<St>) -> Settings {
 }
 
 #[tauri::command]
-pub fn save_settings(app: AppHandle, st: State<St>, settings: Settings) -> R<()> {
+pub fn save_settings(app: AppHandle, st: State<St>, mut settings: Settings) -> R<()> {
     let old = st.settings.read().clone();
+    if settings.sync_enabled {
+        // Only the person turns sync on (the sync question or the Settings toggle).
+        settings.sync_asked = true;
+    }
     st.save_settings(settings.clone()).map_err(e)?;
-    if old.synced() != settings.synced() {
+    if settings.sync_enabled && !old.sync_enabled {
+        crate::sync::turned_on(&st);
+    } else if old.synced() != settings.synced() {
         crate::sync::push_settings(&st);
     }
     // Cereal never launches at login; `launch_at_login` is ignored.
@@ -371,9 +377,21 @@ pub async fn toolbay_account() -> Option<crate::hub::Account> {
     crate::hub::account().await
 }
 
+/// (signed in to Toolbay on this computer, sync on and signed in). No network.
 #[tauri::command]
 pub fn sync_status(st: State<St>) -> (bool, bool) {
     (crate::account::token().is_some(), crate::sync::available(&st))
+}
+
+/// Turns sync off and deletes Cereal's synced copy from the Toolbay account.
+#[tauri::command]
+pub async fn sync_delete_remote(st: State<'_, St>) -> R<()> {
+    let st = st.inner().clone();
+    let mut s = st.settings.read().clone();
+    s.sync_enabled = false;
+    s.sync_asked = true;
+    st.save_settings(s).map_err(e)?;
+    crate::sync::delete_remote(&st).await.map_err(e)
 }
 
 /// Live captions open/closed on the floating indicator.

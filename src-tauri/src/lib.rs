@@ -537,6 +537,7 @@ pub fn run() {
             commands::quit,
             commands::toolbay_account,
             commands::sync_status,
+            commands::sync_delete_remote,
             commands::pill_click,
             commands::still_here,
             commands::screens_list,

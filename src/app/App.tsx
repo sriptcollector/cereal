@@ -250,7 +250,50 @@ export default function App() {
       </main>
       {palette && <Palette go={go} onClose={() => setPalette(false)} />}
       {feedback && <Feedback onClose={() => setFeedback(false)} />}
+      {!settings.sync_asked && <SyncQuestion />}
     </div>
+  );
+}
+
+/**
+ * The one-time sync question, for people signed in to Toolbay. Sync is off until
+ * they pick "Turn on sync" here or turn it on in Settings. Closing the box keeps
+ * it off and asks again next time.
+ */
+function SyncQuestion() {
+  const [, save] = useSettings();
+  const [signedIn, setSignedIn] = useState(false);
+  const [closed, setClosed] = useState(false);
+  useEffect(() => {
+    const check = () =>
+      api
+        .syncStatus()
+        .then(([signed]) => setSignedIn(signed))
+        .catch(() => {});
+    check();
+    window.addEventListener("focus", check);
+    return () => window.removeEventListener("focus", check);
+  }, []);
+  if (!signedIn || closed) return null;
+  const choose = (on: boolean) => save({ sync_enabled: on, sync_asked: true }).then(() => setClosed(true));
+  return (
+    <Modal onClose={() => setClosed(true)}>
+      <h2>Sync across your computers?</h2>
+      <p>Sync your profile across your computers through your Toolbay account? Toolbay's server can read this data.</p>
+      <p className="muted small">
+        Sync sends your name, job title, role, about you, company, vocabulary, consent note, recording choices and custom templates to toolbay.ai. It is not end-to-end
+        encrypted. Calendar links, recordings, transcripts, notes and API keys are never sent. Nothing is sent unless you turn it on, and you can turn it off or delete
+        the synced copy any time in Settings, under Account.
+      </p>
+      <div className="actions">
+        <button className="btn ghost" onClick={() => choose(false)}>
+          Keep it on this computer
+        </button>
+        <button className="btn dark" onClick={() => choose(true)}>
+          Turn on sync
+        </button>
+      </div>
+    </Modal>
   );
 }
 

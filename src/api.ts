@@ -23,6 +23,7 @@ export interface Settings {
   default_template: string;
   keep_audio: "keep" | "30d" | "delete";
   sync_enabled: boolean;
+  sync_asked: boolean;
   job_title: string;
   about: string;
   role: string;
@@ -329,6 +330,7 @@ export const api = {
   quit: () => invoke<void>("quit"),
   account: () => invoke<Account | null>("toolbay_account"),
   syncStatus: () => invoke<[boolean, boolean]>("sync_status"),
+  syncDeleteRemote: () => invoke<void>("sync_delete_remote"),
   pillClick: () => invoke<void>("pill_click"),
   stillHere: () => invoke<void>("still_here"),
   screens: (id: string) => invoke<{ name: string; thumb: string }[]>("screens_list", { id }),

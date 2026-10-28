@@ -1,7 +1,10 @@
 //! Settings and custom templates follow the user to their other computers through
 //! the Toolbay account (toolbay.ai /api/v1/me/tools/cereal/sync). Only when
-//! the person is signed in to the Toolbay app, and only these small items:
-//! recordings, transcripts and notes never leave this computer.
+//! the person is signed in to the Toolbay app AND turned sync on (off by
+//! default; every request below checks it), and only these small items. They
+//! are stored on toolbay.ai where Toolbay's server can read them (not end-to-end
+//! encrypted). Recordings, transcripts, notes, API keys and calendar (iCal)
+//! links are never synced.
 //!
 //! Keys: "settings" (the Synced subset), "templates/<id>" (one per custom template).
 
@@ -139,17 +142,55 @@ pub fn push_template(st: &St, t: Option<&Template>, id: &str) {
     });
 }
 
-/// On start and every 5 minutes.
+/// On start and every 5 minutes. Does nothing (no network) while sync is off
+/// or nobody is signed in.
 pub fn start(st: St) {
-    if token().is_none() {
-        return;
-    }
     tauri::async_runtime::spawn(async move {
         loop {
-            if let Err(e) = pull(&st).await {
-                log::warn!("sync pull: {e:#}");
+            if available(&st) {
+                if let Err(e) = pull(&st).await {
+                    log::warn!("sync pull: {e:#}");
+                }
             }
             tokio::time::sleep(Duration::from_secs(300)).await;
         }
     });
+}
+
+/// The person just turned sync on: read the account copy, then send this
+/// computer's settings (which also replaces any calendar links an older version
+/// put in the account). Templates sync as they are saved.
+pub fn turned_on(st: &St) {
+    if !available(st) {
+        return;
+    }
+    let st = st.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = pull(&st).await {
+            log::warn!("sync pull: {e:#}");
+        }
+        let v = serde_json::to_value(st.settings.read().synced()).unwrap_or_default();
+        if let Err(e) = push(&st, "settings", Some(v)).await {
+            log::warn!("sync settings: {e:#}");
+        }
+    });
+}
+
+/// Deletes everything Cereal synced from the person's Toolbay account (the
+/// server keeps nothing). This computer keeps its copy.
+pub async fn delete_remote(st: &St) -> Result<()> {
+    let tok = token().ok_or_else(|| anyhow!("Sign in to the Toolbay app first."))?;
+    let r = reqwest::Client::new()
+        .delete(API)
+        .bearer_auth(&tok)
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|_| anyhow!("Couldn't reach toolbay.ai. Check your internet connection and try again."))?;
+    if !r.status().is_success() {
+        return Err(anyhow!("Couldn't delete the synced copy ({}). Try again in a minute.", r.status()));
+    }
+    let _ = st.db.set_kv("sync.versions", "{}");
+    let _ = st.db.set_kv("sync.rev", "0");
+    Ok(())
 }

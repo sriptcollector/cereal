@@ -1,6 +1,6 @@
 [package]
 name = "cereal"
-version = "0.4.3"
+version = "0.4.4"
 description = "Cereal: free, local, open-source AI meeting notes. No bot joins your call."
 authors = ["Orion Jones"]
 license = "MIT"

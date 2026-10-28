@@ -1,13 +1,17 @@
-//! User settings, saved as settings.json in the app config folder. The parts that
-//! make sense on every computer (name, language, templates, recording choices) sync
-//! through the Toolbay account; device-specific ones (microphone, models) don't.
+//! User settings, saved as settings.json in the app config folder. If the person
+//! turns sync on (off by default), the parts that make sense on every computer
+//! (profile, language, recording choices) sync through the Toolbay account;
+//! device-specific ones (microphone, models, keys) and calendar links never do.
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use toolbay_engine::chat::Provider;
 use toolbay_engine::stt::CloudCfg;
 
-pub const DEFAULT_CONSENT: &str = "Heads up: I'm taking notes with Cereal, which transcribes this call on my computer to help me write up notes. Nothing is sent to a bot or a server. Let me know if you'd rather I didn't.";
+pub const DEFAULT_CONSENT: &str = "Heads up: I'm taking notes with Cereal, which transcribes this call to help me write up notes. No bot joins the call. Let me know if you'd rather I didn't.";
+/// The default note up to 0.4.3. Its "on my computer ... nothing is sent to a
+/// server" isn't true with a cloud speech or AI option, so it is replaced.
+const OLD_CONSENT: &str = "Heads up: I'm taking notes with Cereal, which transcribes this call on my computer to help me write up notes. Nothing is sent to a bot or a server. Let me know if you'd rather I didn't.";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -39,7 +43,12 @@ pub struct Settings {
     pub keep_audio: String,
     /// Ignored: Cereal never launches at login. Kept so saved settings still load.
     pub launch_at_login: bool,
+    /// Sync the profile and recording choices through the Toolbay account
+    /// (toolbay.ai can read them). Off by default: only the person turns it on.
     pub sync_enabled: bool,
+    /// The person answered the sync question (or turned sync on themselves).
+    /// Until then sync stays off, whatever an older version saved.
+    pub sync_asked: bool,
     /// Short sounds when notes start, pause, resume and stop.
     pub sounds: bool,
     /// The floating indicator while recording when Cereal isn't in front. Automatic
@@ -127,7 +136,8 @@ impl Default for Settings {
             default_template: "auto".into(),
             keep_audio: "keep".into(),
             launch_at_login: false,
-            sync_enabled: true,
+            sync_enabled: false,
+            sync_asked: false,
             sounds: true,
             show_indicator: true,
             quick_chat: true,
@@ -167,7 +177,9 @@ impl Default for Settings {
     }
 }
 
-/// The subset that follows the user to other computers through Toolbay sync.
+/// The subset that follows the user to other computers through Toolbay sync,
+/// when they turn it on. Never calendar links: a secret iCal address gives
+/// anyone who has it the whole calendar, so it stays on this computer.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 #[serde(default)]
 pub struct Synced {
@@ -190,7 +202,6 @@ pub struct Synced {
     pub role: String,
     pub vocabulary: Vec<String>,
     pub summary_language: String,
-    pub calendars: Vec<crate::calendar::CalendarSrc>,
     pub calendar_popups: bool,
     pub reposition: bool,
     pub transcript_retention: String,
@@ -217,7 +228,6 @@ impl Settings {
             role: self.role.clone(),
             vocabulary: self.vocabulary.clone(),
             summary_language: self.summary_language.clone(),
-            calendars: self.calendars.clone(),
             calendar_popups: self.calendar_popups,
             reposition: self.reposition,
             transcript_retention: self.transcript_retention.clone(),
@@ -254,7 +264,6 @@ impl Settings {
         if !s.summary_language.is_empty() {
             self.summary_language = s.summary_language.clone();
         }
-        self.calendars = s.calendars.clone();
         self.calendar_popups = s.calendar_popups;
         self.reposition = s.reposition;
         if !s.transcript_retention.is_empty() {
@@ -278,7 +287,28 @@ pub fn path(dir: &Path) -> PathBuf {
 }
 
 pub fn load(dir: &Path) -> Settings {
-    std::fs::read_to_string(path(dir)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+    let mut s: Settings = std::fs::read_to_string(path(dir)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+    if migrate(&mut s) {
+        let _ = save(dir, &s);
+    }
+    s
+}
+
+/// One-time privacy migration. Up to 0.4.3 sync was on by default, so a saved
+/// `sync_enabled: true` doesn't mean the person chose it: sync stays off until
+/// they answer the sync question or turn it on in Settings. Also swaps the old
+/// default consent note for the accurate one. Returns true when it changed something.
+pub fn migrate(s: &mut Settings) -> bool {
+    let mut changed = false;
+    if !s.sync_asked && s.sync_enabled {
+        s.sync_enabled = false;
+        changed = true;
+    }
+    if s.consent_message == OLD_CONSENT {
+        s.consent_message = DEFAULT_CONSENT.into();
+        changed = true;
+    }
+    changed
 }
 
 pub fn save(dir: &Path, s: &Settings) -> anyhow::Result<()> {
@@ -287,4 +317,50 @@ pub fn save(dir: &Path, s: &Settings) -> anyhow::Result<()> {
     std::fs::write(&tmp, serde_json::to_string_pretty(s)?)?;
     std::fs::rename(tmp, path(dir))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sync_is_off_by_default() {
+        let s = Settings::default();
+        assert!(!s.sync_enabled);
+        assert!(!s.sync_asked);
+    }
+
+    #[test]
+    fn old_settings_with_sync_on_are_turned_off_once() {
+        let mut s: Settings = serde_json::from_str(r#"{"onboarded": true, "sync_enabled": true}"#).unwrap();
+        assert!(migrate(&mut s));
+        assert!(!s.sync_enabled);
+        assert!(!migrate(&mut s));
+    }
+
+    #[test]
+    fn a_chosen_sync_stays_on() {
+        let mut s: Settings = serde_json::from_str(r#"{"sync_enabled": true, "sync_asked": true}"#).unwrap();
+        assert!(!migrate(&mut s));
+        assert!(s.sync_enabled);
+    }
+
+    #[test]
+    fn calendar_links_never_sync() {
+        let mut s = Settings::default();
+        s.calendars.push(crate::calendar::CalendarSrc {
+            id: "c1".into(),
+            name: "Work".into(),
+            url: "https://calendar.google.com/calendar/ical/secret-abc/basic.ics".into(),
+            enabled: true,
+        });
+        let v = serde_json::to_string(&s.synced()).unwrap();
+        assert!(!v.contains("secret-abc"));
+        assert!(!v.contains("calendars"));
+        // An item an older version synced (with calendars) never replaces local ones.
+        let old: Synced = serde_json::from_str(r#"{"name": "A", "calendars": [{"id": "x", "name": "X", "url": "https://evil/ics", "enabled": true}]}"#).unwrap();
+        let mut here = s.clone();
+        here.apply_synced(&old);
+        assert_eq!(here.calendars, s.calendars);
+    }
 }

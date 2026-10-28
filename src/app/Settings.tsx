@@ -40,6 +40,8 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
   const [status, setStatus] = useState("");
   const [account, setAccount] = useState<Account | null>(null);
   const [sync, setSync] = useState<[boolean, boolean]>([false, false]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [app, setApp] = useState<{ version: string; fromHub: boolean; dataDir: string } | null>(null);
   const [advanced, setAdvanced] = useState(false);
   const [newCal, setNewCal] = useState("");
@@ -242,7 +244,7 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
           <div className="row col">
             <div className="row-title">Add a calendar</div>
             <div className="row-desc">
-              Paste your calendar's private iCal address. Google Calendar: Settings › your calendar › “Secret address in iCal format”. Outlook: Settings › Calendar › Shared calendars › Publish a calendar › ICS. Cereal reads it every 10 minutes; nothing is sent anywhere else.
+              Paste your calendar's private iCal address. Google Calendar: Settings › your calendar › “Secret address in iCal format”. Outlook: Settings › Calendar › Shared calendars › Publish a calendar › ICS. Cereal reads it every 10 minutes. The address stays on this computer and is never synced.
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input style={{ flex: 1 }} value={newCal} placeholder="https://calendar.google.com/calendar/ical/…/private-…/basic.ics" onChange={(e) => setNewCal(e.target.value)} />
@@ -296,7 +298,7 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
           <div className="row col">
             <div className="row-title">Use your notes in other AI apps (MCP)</div>
             <div className="row-desc">
-              Claude Desktop, Cursor and other MCP apps can read and search your notes. Everything stays on this computer. Add this to the app's MCP settings (for Claude
+              Claude Desktop, Cursor and other MCP apps can read and search your notes. Cereal hands them over on this computer; the other app may send what it reads to its own AI service. Add this to the app's MCP settings (for Claude
               Desktop: Settings › Developer › Edit config):
             </div>
             <pre className="code">{mcp}</pre>
@@ -401,8 +403,11 @@ cereal folders list`}</pre>
         </Section>
 
         <Section title="Data & privacy" id="data">
-          <Row title="Everything stays on this computer" desc="Audio, transcripts and notes are stored and processed here. No bot joins your calls, no analytics, no account needed. Cereal never trains on your data." />
-          <Row title="Keep recordings" desc="Audio files are only ever on this computer.">
+          <Row
+            title="Stored and processed on this computer"
+            desc="Audio, transcripts and notes are kept here. They're only sent somewhere if you pick a cloud speech engine or notes AI, or set up a connector (Notion, HubSpot, a webhook). Sync never sends them. No bot joins your calls, no analytics, no account needed. Cereal never trains on your data."
+          />
+          <Row title="Keep recordings" desc="Audio files are stored only on this computer.">
             <select value={s.keep_audio} onChange={(e) => save({ keep_audio: e.target.value as "keep" })}>
               <option value="keep">Keep</option>
               <option value="30d">Delete after 30 days</option>
@@ -443,13 +448,63 @@ cereal folders list`}</pre>
         <Section title="Account" id="account">
           {sync[0] ? (
             <>
-              <Row title={account ? `Signed in as ${account.name || account.handle}` : "Signed in through the Toolbay app"} desc="Settings, templates and recipes sync to your other computers. Recordings, transcripts and notes stay here." />
-              <Row title="Sync settings and templates">
-                <Toggle on={s.sync_enabled} onChange={(v) => save({ sync_enabled: v })} />
+              <Row
+                title={account ? `Signed in as ${account.name || account.handle}` : "Signed in through the Toolbay app"}
+                desc={s.sync_enabled ? "Sync is on." : "Sync is off. Nothing is synced to Toolbay from this computer."}
+              />
+              <Row
+                title="Sync my profile across my computers"
+                desc="Sends your name, job title, role, about you, company, vocabulary, consent note, recording and notes choices, and your custom templates to your Toolbay account on toolbay.ai. Toolbay's server can read this data (it is not end-to-end encrypted). Calendar links, recordings, transcripts, notes and API keys are never sent. Off unless you turn it on."
+              >
+                <Toggle
+                  on={s.sync_enabled}
+                  onChange={(v) => {
+                    setDeleted(false);
+                    save({ sync_enabled: v, sync_asked: true }).then(() => api.syncStatus().then(setSync));
+                  }}
+                />
+              </Row>
+              <Row
+                title="Delete my synced data from Toolbay"
+                desc={
+                  deleted
+                    ? "Done. Toolbay no longer has a synced copy, and sync is off. Everything is still on this computer."
+                    : "Deletes everything Cereal synced from your Toolbay account and turns sync off. Your copy on this computer is kept."
+                }
+              >
+                {confirmDelete ? (
+                  <>
+                    <button
+                      className="btn danger"
+                      onClick={() =>
+                        api
+                          .syncDeleteRemote()
+                          .then(() => {
+                            setDeleted(true);
+                            api.syncStatus().then(setSync);
+                          })
+                          .catch((err) => toast(String(err)))
+                          .finally(() => setConfirmDelete(false))
+                      }
+                    >
+                      Delete
+                    </button>
+                    <button className="btn ghost" onClick={() => setConfirmDelete(false)}>
+                      Keep it
+                    </button>
+                  </>
+                ) : (
+                  <button className="btn ghost" onClick={() => setConfirmDelete(true)}>
+                    Delete…
+                  </button>
+                )}
               </Row>
             </>
           ) : (
-            <Row title="Not signed in" desc="Sign in to the Toolbay app to sync settings and templates between computers and to send feedback. Everything else works without an account." />
+            <Row
+              title="Not signed in"
+              desc="Sign in to the Toolbay app to send feedback, or to sync your profile between computers if you turn sync on. Signing in alone sends nothing. Everything else works without an account."
+            />
           )}
         </Section>
 

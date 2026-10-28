@@ -277,7 +277,7 @@ export default function FolderPage({ id, go, tab: initialTab }: { id: string; go
         <Modal onClose={() => setIntegrations(false)}>
           <h2>Integrations</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Automate this folder. Everything runs on this computer.
+            Automate this folder. Filing runs on this computer; a webhook sends each new note to the address you paste.
           </p>
           <label className="field">
             <span>File meetings here automatically when the title contains</span>

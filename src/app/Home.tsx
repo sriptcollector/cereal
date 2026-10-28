@@ -226,7 +226,7 @@ export default function Home({ go, quickNote, myNotes }: { go: Go; quickNote: ()
             <ol className="muted" style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
               <li>Join a call in Zoom, Google Meet, Teams or Slack. Cereal starts taking notes (you'll see a small indicator), or click Quick note.</li>
               <li>Type a few rough notes as you go.</li>
-              <li>When the call ends, the AI on this computer writes clean notes from your notes and the transcript.</li>
+              <li>When the call ends, the notes AI (on this computer unless you pick a cloud one) writes clean notes from your notes and the transcript.</li>
             </ol>
           </div>
         ) : (
