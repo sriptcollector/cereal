@@ -24,10 +24,10 @@ pub fn save_settings(app: AppHandle, st: State<St>, settings: Settings) -> R<()>
     if old.synced() != settings.synced() {
         crate::sync::push_settings(&st);
     }
-    if old.launch_at_login != settings.launch_at_login {
+    // Cereal never launches at login; `launch_at_login` is ignored.
+    {
         use tauri_plugin_autostart::ManagerExt;
-        let al = app.autolaunch();
-        let _ = if settings.launch_at_login { al.enable() } else { al.disable() };
+        let _ = app.autolaunch().disable();
     }
     if old.model_mode != settings.model_mode || old.speech_model != settings.speech_model || old.llm_model != settings.llm_model || old.use_gpu != settings.use_gpu || old.language != settings.language {
         *st.whisper.lock() = None;

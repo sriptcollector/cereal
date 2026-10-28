@@ -22,7 +22,6 @@ export interface Settings {
   consent_message: string;
   default_template: string;
   keep_audio: "keep" | "30d" | "delete";
-  launch_at_login: boolean;
   sync_enabled: boolean;
   job_title: string;
   about: string;

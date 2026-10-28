@@ -4,8 +4,8 @@
 //! Control: the hub (or anyone) runs `cereal.exe --show | --hide | --quit`, and
 //! `--start` / `--stop` (take notes now / stop), `--open <page>` ("meeting:<id>", "settings"…).
 //! Notes is single-instance, so that second process forwards its arguments to the
-//! running one and exits. While hidden, Notes keeps working from the tray (and keeps
-//! recording if a meeting is on).
+//! running one and exits. `--hide` minimizes the window; nothing runs in the
+//! background, so closing the main window quits Cereal.
 //!
 //! State: `<app data>/running.json` = {pid, version, visible, window, updatedAt, hub, recording},
 //! rewritten on every show/hide/record change and removed on quit.
@@ -28,11 +28,12 @@ pub fn handle_args(app: &AppHandle, args: &[String]) {
     } else if args.iter().any(|a| a == "--quit") {
         quit(app);
     } else if args.iter().any(|a| a == "--hide") {
+        // Minimize, never hide: a hidden window would leave Cereal running unseen.
         if let Some(w) = app.get_webview_window("main") {
-            let _ = w.hide();
+            let _ = w.minimize();
         }
-        crate::WANT_VISIBLE.store(false, std::sync::atomic::Ordering::SeqCst);
         write_state(app);
+        crate::update_pill(app);
     } else if args.iter().any(|a| a == "--start") {
         // Start taking notes now (a new note) and show it.
         if let Some(st) = app.try_state::<crate::state::St>() {
@@ -90,8 +91,13 @@ pub fn quit(app: &AppHandle) {
             }
         }
     }
-    let _ = std::fs::remove_file(state_path(app));
+    clear_state(app);
     app.exit(0);
+}
+
+/// Removes running.json (the app is no longer running).
+pub fn clear_state(app: &AppHandle) {
+    let _ = std::fs::remove_file(state_path(app));
 }
 
 fn state_path(app: &AppHandle) -> PathBuf {

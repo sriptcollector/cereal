@@ -228,11 +228,6 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
               <option value="dark">Dark</option>
             </select>
           </Row>
-          {!app?.fromHub && (
-            <Row title="Open at login" desc="So Cereal can notice meetings.">
-              <Toggle on={s.launch_at_login} onChange={(v) => save({ launch_at_login: v })} />
-            </Row>
-          )}
         </Section>
 
         <Section title="Calendar" id="calendar">
@@ -468,7 +463,7 @@ cereal folders list`}</pre>
             <Credit />
           </div>
           {!app?.fromHub && (
-            <Row title="Quit Cereal" desc="Stops meeting detection until you open it again.">
+            <Row title="Quit Cereal" desc="Closing this window also quits Cereal and stops meeting detection until you open it again.">
               <button className="btn ghost danger" onClick={() => api.quit()}>
                 Quit
               </button>

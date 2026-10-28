@@ -87,12 +87,10 @@ fn create_main(app: &AppHandle, visible: bool) -> tauri::Result<()> {
     });
     let w2 = w.clone();
     w.on_window_event(move |ev| match ev {
-        tauri::WindowEvent::CloseRequested { api, .. } => {
-            // Closing the window keeps Notes in the tray (and keeps recording).
-            api.prevent_close();
-            let _ = w2.hide();
-            hub::write_state(w2.app_handle());
-            update_pill(w2.app_handle());
+        tauri::WindowEvent::CloseRequested { .. } => {
+            // Nothing runs in the background: closing the main window quits Cereal
+            // (a recording is finished properly first), popup, pill and tray included.
+            hub::quit(w2.app_handle());
         }
         tauri::WindowEvent::Focused(_) => update_pill(w2.app_handle()),
         _ => {}
@@ -436,9 +434,14 @@ pub fn run() {
             let st = St::new(Some(handle.clone()), config_dir, data_dir, St::bundled_dir(&handle))?;
             app.manage(st.clone());
 
-            let s = st.settings.read().clone();
-            let hidden = std::env::args().any(|a| a == "--hidden") && s.onboarded;
-            create_main(&handle, !hidden)?;
+            // No launch at login: remove any login item / Run key an older version made.
+            {
+                use tauri_plugin_autostart::ManagerExt;
+                let _ = handle.autolaunch().disable();
+            }
+
+            // Always show the main window at launch (an old `--hidden` flag is ignored).
+            create_main(&handle, true)?;
 
             TrayIconBuilder::with_id("notes")
                 .icon(app.default_window_icon().cloned().unwrap())
@@ -454,10 +457,6 @@ pub fn run() {
                 .build(app)?;
 
             hub::write_state(&handle);
-            if s.launch_at_login && !hub::from_hub() {
-                use tauri_plugin_autostart::ManagerExt;
-                let _ = handle.autolaunch().enable();
-            }
             // cereal:// links (Windows registers the scheme for this user).
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -593,12 +592,9 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building Cereal")
-        .run(|_app, ev| {
-            if let tauri::RunEvent::ExitRequested { code, api, .. } = ev {
-                // Keep running in the tray when windows close; real quits pass a code.
-                if code.is_none() {
-                    api.prevent_exit();
-                }
+        .run(|app, ev| {
+            if let tauri::RunEvent::Exit = ev {
+                hub::clear_state(app);
             }
         });
 }

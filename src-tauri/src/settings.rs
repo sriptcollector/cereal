@@ -37,6 +37,7 @@ pub struct Settings {
     pub default_template: String,
     /// "keep" | "30d" | "delete" (delete audio once the transcript is final).
     pub keep_audio: String,
+    /// Ignored: Cereal never launches at login. Kept so saved settings still load.
     pub launch_at_login: bool,
     pub sync_enabled: bool,
     /// Short sounds when notes start, pause, resume and stop.
@@ -125,7 +126,7 @@ impl Default for Settings {
             consent_message: DEFAULT_CONSENT.into(),
             default_template: "auto".into(),
             keep_audio: "keep".into(),
-            launch_at_login: true,
+            launch_at_login: false,
             sync_enabled: true,
             sounds: true,
             show_indicator: true,
