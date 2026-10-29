@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, Hit, on, RecState } from "../api";
-import { Icon, LogoImg, Modal, toast, useFolders, useSettings, useTheme, dayLabel } from "./ui";
+import { flushAll, Icon, LogoImg, Modal, toast, useFolders, useSettings, useTheme, dayLabel } from "./ui";
 import { fmtDur } from "./md";
 import Onboarding from "./Onboarding";
 import Home from "./Home";
@@ -63,10 +63,15 @@ export default function App() {
     });
     const u2 = on<RecState>("recording", setRec);
     const u3 = on("meeting-deleted", loadTrash);
+    // Closing the window or quitting: save what's still waiting, then quit.
+    const u4 = on("flush-and-quit", () => {
+      void flushAll().finally(() => api.quit());
+    });
     return () => {
       u1();
       u2();
       u3();
+      u4();
     };
   }, []);
 

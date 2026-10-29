@@ -68,6 +68,9 @@ pub fn start_with(st: &St, meeting_id: Option<String>, app: &str, title: &str, a
         }
         return Err(anyhow!("Already taking notes in another meeting. Stop that one first."));
     }
+    if crate::updates::INSTALLING.load(Ordering::SeqCst) {
+        return Err(anyhow!("Cereal is installing an update and restarts in a moment. Try again then."));
+    }
     let s = st.settings.read().clone();
     let m = match meeting_id.and_then(|id| st.db.meeting(&id).ok().flatten()) {
         Some(m) => m,
@@ -146,12 +149,12 @@ pub fn stop(st: &St) -> Option<String> {
     std::thread::spawn(move || {
         if let Some(c) = cap {
             let secs = c.secs();
+            let blocked = c.blocked();
             let dir = c.stop();
             let prev = st2.db.meeting(&id).ok().flatten().map(|m| m.duration_s).unwrap_or(0.0);
             let _ = st2.db.set_duration(&id, prev + secs);
             log::info!("recording stopped: {id} ({secs:.0} s) in {}", dir.display());
-            // A false alarm from detection (under a minute, or nobody spoke): drop it quietly.
-            if auto && prev == 0.0 {
+            if (auto && prev == 0.0) || blocked.is_some() {
                 let said = st2.db.segments(&id).map(|v| v.iter().any(|s| s.text.split_whitespace().count() >= 3)).unwrap_or(false);
                 // Live text can lag; also count real voice in the recording (8+ seconds).
                 let voiced = |f: &str| {
@@ -159,7 +162,20 @@ pub fn stop(st: &St) -> Option<String> {
                 };
                 let spoke = said || voiced("system.wav") + voiced("mic.wav") > 8 * 16_000;
                 let typed = st2.db.meeting(&id).ok().flatten().map(|m| !m.my_notes.trim().is_empty()).unwrap_or(false);
-                if !typed && (secs < 60.0 || !spoke) {
+                // A track was blocked (macOS permission off) and nothing was heard:
+                // never discard it as "nobody spoke" or write empty notes. Keep it
+                // and say what happened.
+                if let Some(why) = blocked.as_ref().filter(|_| !spoke && !typed) {
+                    log::warn!("recording {id} heard nothing, a track was blocked: {why}");
+                    let _ = st2.db.set(&id, "ended_at", &now());
+                    let _ = st2.db.set(&id, "status", "failed");
+                    let _ = st2.db.set(&id, "step", "");
+                    let _ = st2.db.set(&id, "error", &format!("Cereal couldn't hear this meeting. {why}"));
+                    st2.meeting_changed(&id);
+                    return;
+                }
+                // A false alarm from detection (under a minute, or nobody spoke): drop it quietly.
+                if auto && prev == 0.0 && blocked.is_none() && !typed && (secs < 60.0 || !spoke) {
                     log::info!("discarded auto recording {id}: {secs:.0} s, speech: {spoke}");
                     let _ = st2.db.delete_meeting(&id);
                     let _ = std::fs::remove_dir_all(st2.meetings_dir().join(&id));

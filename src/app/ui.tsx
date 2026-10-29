@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, Folder, on, Recipe, Settings, Template } from "../api";
 import { invoke } from "@tauri-apps/api/core";
 import logo from "../assets/logo-pixel.png";
@@ -19,8 +19,14 @@ export function LogoImg(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   return <img {...props} src={dark ? logo : logoLight} style={{ imageRendering: "pixelated", ...props.style }} />;
 }
 
-/** Shared settings state with optimistic save. */
-export function useSettings(): [Settings | null, (patch: Partial<Settings>) => Promise<void>, () => void] {
+export type SettingsPatch = Partial<Settings> | ((cur: Settings) => Partial<Settings>);
+
+/** Saves run one at a time, so two quick ones never undo each other. */
+let saveQueue: Promise<unknown> = Promise.resolve();
+
+/** Shared settings state with optimistic save. A patch can be a function of the
+ *  freshly read settings (for nested values like `speech_cloud`). */
+export function useSettings(): [Settings | null, (patch: SettingsPatch) => Promise<void>, () => void] {
   const [s, setS] = useState<Settings | null>(null);
   const reload = useCallback(() => {
     api.getSettings().then(setS);
@@ -29,13 +35,57 @@ export function useSettings(): [Settings | null, (patch: Partial<Settings>) => P
     reload();
     return on("settings-changed", reload);
   }, [reload]);
-  const save = useCallback(async (patch: Partial<Settings>) => {
-    const cur = await api.getSettings();
-    const next = { ...cur, ...patch };
-    setS(next);
-    await api.saveSettings(next);
+  const save = useCallback((patch: SettingsPatch) => {
+    const run = saveQueue.then(async () => {
+      const cur = await api.getSettings();
+      const next = { ...cur, ...(typeof patch === "function" ? patch(cur) : patch) };
+      setS(next);
+      await api.saveSettings(next);
+    });
+    saveQueue = run.catch(() => {});
+    return run;
   }, []);
   return [s, save, reload];
+}
+
+/** Saves still waiting on their debounce, run before the window closes. */
+const waiting = new Set<() => Promise<void>>();
+
+/** Runs every debounced save that hasn't happened yet. */
+export async function flushAll() {
+  await Promise.allSettled([...waiting].map((f) => f()));
+}
+
+/** `fn` runs `ms` after the last call, with the last value. `.flush()` runs it
+ *  now; it also runs on unmount and before Cereal quits (`flushAll`). */
+export function useDebounced<T>(fn: (v: T) => unknown, ms: number) {
+  const t = useRef<number | undefined>(undefined);
+  const f = useRef(fn);
+  f.current = fn;
+  // The value and the function as they were at call time (so a later render,
+  // e.g. another meeting's id, never changes where it's saved).
+  const next = useRef<{ v: T; fn: (v: T) => unknown } | null>(null);
+  const flush = useCallback(async () => {
+    window.clearTimeout(t.current);
+    const n = next.current;
+    next.current = null;
+    if (n) await n.fn(n.v);
+  }, []);
+  useEffect(() => {
+    waiting.add(flush);
+    return () => {
+      waiting.delete(flush);
+      void flush();
+    };
+  }, [flush]);
+  return useMemo(() => {
+    const call = (v: T) => {
+      next.current = { v, fn: f.current };
+      window.clearTimeout(t.current);
+      t.current = window.setTimeout(() => void flush(), ms);
+    };
+    return Object.assign(call, { flush });
+  }, [ms, flush]);
 }
 
 export function useTemplates(): [Template[], () => void] {

@@ -209,14 +209,14 @@ pub fn template_save(st: State<St>, mut template: Template) -> R<Template> {
     template.builtin = false;
     template.updated_at = crate::db::now();
     st.db.save_template(&template).map_err(e)?;
-    crate::sync::push_template(&st, Some(&template), &template.id);
+    crate::sync::push_template(&st, &template.id);
     Ok(template)
 }
 
 #[tauri::command]
 pub fn template_delete(st: State<St>, id: String) -> R<()> {
     st.db.delete_template(&id).map_err(e)?;
-    crate::sync::push_template(&st, None, &id);
+    crate::sync::push_template(&st, &id);
     Ok(())
 }
 

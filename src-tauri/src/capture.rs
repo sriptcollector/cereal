@@ -110,6 +110,13 @@ pub struct Track {
     pub error: Option<String>,
     /// Noise floor estimate (RMS) for the speech detector.
     floor: f32,
+    /// Device samples in a row that were exactly zero (macOS hands out pure zeros
+    /// when the microphone permission is off).
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    zero_run: u64,
+    /// Why this track couldn't record, if it was blocked at any point (so the
+    /// recording is never thrown away as "nobody spoke").
+    pub blocked: Option<String>,
 }
 
 impl Track {
@@ -127,6 +134,8 @@ impl Track {
             device: String::new(),
             error: None,
             floor: 0.003,
+            zero_run: 0,
+            blocked: None,
         })
     }
 
@@ -167,6 +176,11 @@ impl Track {
         if !out.is_empty() {
             let rms = (out.iter().map(|v| v * v).sum::<f32>() / out.len() as f32).sqrt();
             self.level = self.level * 0.7 + rms * 0.3;
+        }
+        if out.iter().all(|v| *v == 0.0) {
+            self.zero_run += out.len() as u64;
+        } else {
+            self.zero_run = 0;
         }
         self.append(&out);
         self.last_data = Instant::now();
@@ -288,6 +302,13 @@ impl Capture {
     pub fn take_chunk(&self, system: bool, min_s: f64, max_s: f64, flush: bool) -> Option<Chunk> {
         let mut t = if system { self.sys.lock() } else { self.mic.lock() };
         take_chunk(&mut t, min_s, max_s, flush)
+    }
+
+    /// Why a track couldn't record, if one was blocked at any point (macOS
+    /// permission off).
+    pub fn blocked(&self) -> Option<String> {
+        let why: Vec<String> = [&self.mic, &self.sys].iter().filter_map(|t| t.lock().blocked.clone()).collect();
+        (!why.is_empty()).then(|| why.join(" "))
     }
 
     pub fn stop(mut self) -> PathBuf {
@@ -488,27 +509,36 @@ fn run(mic: Arc<Mutex<Track>>, sys: Arc<Mutex<Track>>, clock: Arc<Mutex<Clock>>,
         None
     };
     #[cfg(target_os = "macos")]
-    let mut sys_stream = if capture_system {
-        match crate::capture_mac::SystemAudio::start(sys.clone(), Box::new({
+    let start_sys = || {
+        crate::capture_mac::SystemAudio::start(sys.clone(), Box::new({
             let c = clock.clone();
             move || {
                 let c = c.lock();
                 if c.since.is_none() { None } else { Some(c.samples()) }
             }
-        })) {
+        }))
+    };
+    #[cfg(target_os = "macos")]
+    let mut sys_stream = if capture_system {
+        match start_sys() {
             Ok(s) => {
                 sys.lock().device = "This Mac's sound".into();
                 Some(s)
             }
             Err(e) => {
                 log::warn!("system audio: {e:#}");
-                sys.lock().error = Some(format!("{e}"));
+                block(&sys, &format!("{e}"));
                 None
             }
         }
     } else {
         None
     };
+    // Microphone permission off: the stream opens but only ever hears zeros.
+    #[cfg(target_os = "macos")]
+    if crate::capture_mac::mic_blocked() {
+        block(&mic, crate::capture_mac::MIC_BLOCKED);
+    }
 
     let _ = ready.send(Ok(()));
     let mut tick = 0u32;
@@ -563,6 +593,45 @@ fn run(mic: Arc<Mutex<Track>>, sys: Arc<Mutex<Track>>, clock: Arc<Mutex<Clock>>,
                     }
                 }
             }
+            #[cfg(target_os = "macos")]
+            {
+                use crate::capture_mac::{MIC_BLOCKED, MIC_SILENT};
+                // Permission off (checked again: it can change mid-call), or pure
+                // zeros / nothing at all from the microphone for 3 seconds.
+                let silent = {
+                    let m = mic.lock();
+                    !paused && (m.zero_run > 3 * RATE as u64 || m.last_data.elapsed() > Duration::from_secs(3))
+                };
+                if crate::capture_mac::mic_blocked() {
+                    block(&mic, MIC_BLOCKED);
+                } else if silent {
+                    block(&mic, MIC_SILENT);
+                } else {
+                    let mut m = mic.lock();
+                    if matches!(m.error.as_deref(), Some(MIC_BLOCKED | MIC_SILENT)) {
+                        m.error = None;
+                    }
+                }
+                if capture_system && sys_stream.is_none() {
+                    // Try again: the person may allow it mid-call. Every 2 s once
+                    // macOS says it's allowed, every 10 s otherwise.
+                    let allowed = crate::capture_mac::sound_allowed();
+                    if allowed || tick % 100 == 0 {
+                        match start_sys() {
+                            Ok(s) => {
+                                log::info!("system audio started");
+                                let mut t = sys.lock();
+                                t.device = "This Mac's sound".into();
+                                t.error = None;
+                                sys_stream = Some(s);
+                            }
+                            Err(e) => block(&sys, &format!("{e}")),
+                        }
+                    } else {
+                        block(&sys, crate::capture_mac::SOUND_BLOCKED);
+                    }
+                }
+            }
         }
     }
     drop(mic_stream);
@@ -575,6 +644,14 @@ fn run(mic: Arc<Mutex<Track>>, sys: Arc<Mutex<Track>>, clock: Arc<Mutex<Clock>>,
         t.pad_to(end);
         t.finish();
     }
+}
+
+/// Marks a track as blocked and says why (shown while recording).
+#[cfg(target_os = "macos")]
+fn block(t: &Arc<Mutex<Track>>, why: &str) {
+    let mut t = t.lock();
+    t.error = Some(why.to_string());
+    t.blocked = Some(why.to_string());
 }
 
 #[cfg(target_os = "macos")]

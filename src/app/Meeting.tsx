@@ -1,24 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, Meeting, on, RecState, Segment, Settings, Source } from "../api";
 import type { Go } from "./App";
-import { copy, dayLabel, Icon, Menu, Modal, timeOf, toast, useFolders, useSettings, useTemplates } from "./ui";
+import { copy, dayLabel, Icon, Menu, Modal, timeOf, toast, useDebounced, useFolders, useSettings, useTemplates } from "./ui";
 import { fmtDur, fmtMinutes, Markdown } from "./md";
 import AskBar, { Thread, useThread } from "./ChatBar";
 import NoteEditor from "./Editor";
 import { TemplatePicker } from "./Templates";
-
-function useDebounced<T>(fn: (v: T) => void, ms: number) {
-  const t = useRef<number | undefined>(undefined);
-  const f = useRef(fn);
-  f.current = fn;
-  return useCallback(
-    (v: T) => {
-      window.clearTimeout(t.current);
-      t.current = window.setTimeout(() => f.current(v), ms);
-    },
-    [ms],
-  );
-}
 
 function namesMap(m: Meeting | null): Record<string, string> {
   try {
@@ -534,6 +521,7 @@ export default function MeetingPage({ id, go, panel }: { id: string; go: Go; pan
                         You {Math.round((rec?.levels?.mic ?? 0) * 100)}% · Them {Math.round((rec?.levels?.system ?? 0) * 100)}%
                       </div>
                       {rec?.levels?.mic_device && <div className="menu-label">Mic: {rec.levels.mic_device}</div>}
+                      {rec?.levels?.mic_error && <div className="menu-label" style={{ color: "var(--warn)" }}>{rec.levels.mic_error}</div>}
                       {rec?.levels?.system_error && <div className="menu-label" style={{ color: "var(--warn)" }}>{rec.levels.system_error}</div>}
                       <button onClick={() => (close(), api.recordPause(!paused))}>
                         {paused ? Icon.play : Icon.pause} {paused ? "Resume" : "Pause"}

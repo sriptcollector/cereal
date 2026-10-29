@@ -57,8 +57,10 @@ pub fn decode(bytes: &[u8]) -> Option<Vec<f32>> {
             if bits != 16 {
                 return None;
             }
-            // A WAV still being written has a placeholder length: read to the end.
-            let end = if len == 0 || body + len > bytes.len() { bytes.len() } else { body + len };
+            // A WAV still being written (or cut off by a crash or forced quit) has a
+            // placeholder or stale length: read all the audio that's there. Only a
+            // real chunk filling the rest of the file (LIST, id3…) ends it early.
+            let end = if len == 0 || body + len > bytes.len() || !chunk_follows(bytes, body + len + (len & 1)) { bytes.len() } else { body + len };
             let frames: Vec<f32> = bytes[body..end]
                 .chunks_exact(2 * ch as usize)
                 .map(|f| f.chunks_exact(2).map(|s| i16::from_le_bytes([s[0], s[1]]) as f32 / 32768.0).sum::<f32>() / ch as f32)
@@ -68,6 +70,26 @@ pub fn decode(bytes: &[u8]) -> Option<Vec<f32>> {
         pos = body + len + (len & 1);
     }
     None
+}
+
+/// Whether `bytes[at..]` is nothing, or RIFF chunks (4-character id + length)
+/// that end exactly at the end of the file, rather than more audio.
+fn chunk_follows(bytes: &[u8], at: usize) -> bool {
+    let mut pos = at;
+    if pos >= bytes.len() {
+        return true;
+    }
+    while pos + 8 <= bytes.len() {
+        if !bytes[pos..pos + 4].iter().all(|b| b.is_ascii_alphanumeric() || *b == b' ') {
+            return false;
+        }
+        let len = u32::from_le_bytes([bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7]]) as usize;
+        pos += 8 + len + (len & 1);
+        if pos == bytes.len() || pos == bytes.len() + 1 {
+            return true;
+        }
+    }
+    false
 }
 
 /// Linear resampler with a small box filter when going down (speech needs up to
@@ -106,6 +128,22 @@ mod tests {
         let d = super::decode(&w).unwrap();
         assert_eq!(d.len(), s.len());
         assert!((d[100] - s[100]).abs() < 0.001);
+    }
+    #[test]
+    fn stale_length_reads_all_audio() {
+        // Header patched at 1000 samples, then 600 more written before a forced quit.
+        let s: Vec<f32> = (0..1600).map(|i| ((i as f32) / 20.0).sin() * 0.5).collect();
+        let mut w = super::encode(&s);
+        let mut h = vec![];
+        super::header(&mut h, 1000);
+        w[..44].copy_from_slice(&h);
+        assert_eq!(super::decode(&w).unwrap().len(), 1600);
+        // A real chunk after the audio still ends it at the declared length.
+        let mut w = super::encode(&s[..1000]);
+        w.extend_from_slice(b"LIST");
+        w.extend_from_slice(&4u32.to_le_bytes());
+        w.extend_from_slice(b"INFO");
+        assert_eq!(super::decode(&w).unwrap().len(), 1000);
     }
     #[test]
     fn down() {

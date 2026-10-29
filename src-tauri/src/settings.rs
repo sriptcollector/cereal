@@ -1,7 +1,8 @@
 //! User settings, saved as settings.json in the app config folder. If the person
 //! turns sync on (off by default), the parts that make sense on every computer
 //! (profile, language, recording choices) sync through the Toolbay account;
-//! device-specific ones (microphone, models, keys) and calendar links never do.
+//! device-specific ones (microphone, models, keys), calendar links and anything
+//! that deletes data here (audio and transcript retention) never do.
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -179,7 +180,9 @@ impl Default for Settings {
 
 /// The subset that follows the user to other computers through Toolbay sync,
 /// when they turn it on. Never calendar links: a secret iCal address gives
-/// anyone who has it the whole calendar, so it stays on this computer.
+/// anyone who has it the whole calendar, so it stays on this computer. Never
+/// `keep_audio` or `transcript_retention` either: a choice made on one computer
+/// must not delete recordings or transcripts on another.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 #[serde(default)]
 pub struct Synced {
@@ -192,7 +195,6 @@ pub struct Synced {
     pub consent_reminder: bool,
     pub consent_message: String,
     pub default_template: String,
-    pub keep_audio: String,
     pub job_title: String,
     pub about: String,
     #[serde(default)]
@@ -204,7 +206,6 @@ pub struct Synced {
     pub summary_language: String,
     pub calendar_popups: bool,
     pub reposition: bool,
-    pub transcript_retention: String,
     pub theme: String,
 }
 
@@ -220,7 +221,6 @@ impl Settings {
             consent_reminder: self.consent_reminder,
             consent_message: self.consent_message.clone(),
             default_template: self.default_template.clone(),
-            keep_audio: self.keep_audio.clone(),
             job_title: self.job_title.clone(),
             about: self.about.clone(),
             company_name: self.company_name.clone(),
@@ -230,7 +230,6 @@ impl Settings {
             summary_language: self.summary_language.clone(),
             calendar_popups: self.calendar_popups,
             reposition: self.reposition,
-            transcript_retention: self.transcript_retention.clone(),
             theme: self.theme.clone(),
         }
     }
@@ -252,9 +251,6 @@ impl Settings {
         if !s.default_template.is_empty() {
             self.default_template = s.default_template.clone();
         }
-        if !s.keep_audio.is_empty() {
-            self.keep_audio = s.keep_audio.clone();
-        }
         self.job_title = s.job_title.clone();
         self.company_name = s.company_name.clone();
         self.company_about = s.company_about.clone();
@@ -266,9 +262,6 @@ impl Settings {
         }
         self.calendar_popups = s.calendar_popups;
         self.reposition = s.reposition;
-        if !s.transcript_retention.is_empty() {
-            self.transcript_retention = s.transcript_retention.clone();
-        }
         if !s.theme.is_empty() {
             self.theme = s.theme.clone();
         }
@@ -286,12 +279,55 @@ pub fn path(dir: &Path) -> PathBuf {
     dir.join("settings.json")
 }
 
+/// settings.json files that couldn't be read and couldn't be copied aside:
+/// never overwritten while Cereal runs.
+static PROTECTED: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+
+/// A missing file means defaults. A file that doesn't read as settings is never
+/// thrown away: it's copied to `settings.json.bad-<time>`, every field that still
+/// reads is kept over the defaults (calendar links, Notion and HubSpot tokens…),
+/// and if the copy couldn't be made the file is left alone.
 pub fn load(dir: &Path) -> Settings {
-    let mut s: Settings = std::fs::read_to_string(path(dir)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+    let p = path(dir);
+    let bytes = match std::fs::read(&p) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Settings::default(),
+        Err(e) => {
+            log::warn!("settings: can't read {}: {e}", p.display());
+            PROTECTED.lock().unwrap().push(p);
+            return Settings::default();
+        }
+    };
+    let mut s = match serde_json::from_slice::<Settings>(&bytes) {
+        Ok(s) => s,
+        Err(e) => {
+            let bad = dir.join(format!("settings.json.bad-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S")));
+            log::warn!("settings: {} doesn't read ({e}); copied to {} and kept every field that does", p.display(), bad.display());
+            if let Err(e) = std::fs::copy(&p, &bad) {
+                log::warn!("settings: couldn't copy it aside ({e}), so it won't be overwritten");
+                PROTECTED.lock().unwrap().push(p.clone());
+            }
+            salvage(&String::from_utf8_lossy(&bytes))
+        }
+    };
     if migrate(&mut s) {
         let _ = save(dir, &s);
     }
     s
+}
+
+/// Defaults with every field of `text` that still reads laid over them.
+fn salvage(text: &str) -> Settings {
+    let Ok(serde_json::Value::Object(file)) = serde_json::from_str::<serde_json::Value>(text) else { return Settings::default() };
+    let mut merged = serde_json::to_value(Settings::default()).unwrap_or_default();
+    for (k, v) in file {
+        let mut trial = merged.clone();
+        trial[k.as_str()] = v;
+        if serde_json::from_value::<Settings>(trial.clone()).is_ok() {
+            merged = trial;
+        }
+    }
+    serde_json::from_value(merged).unwrap_or_default()
 }
 
 /// One-time privacy migration. Up to 0.4.3 sync was on by default, so a saved
@@ -312,6 +348,9 @@ pub fn migrate(s: &mut Settings) -> bool {
 }
 
 pub fn save(dir: &Path, s: &Settings) -> anyhow::Result<()> {
+    if PROTECTED.lock().unwrap().contains(&path(dir)) {
+        anyhow::bail!("Cereal couldn't read its settings file, so it won't overwrite it. Restart Cereal to try again.");
+    }
     std::fs::create_dir_all(dir)?;
     let tmp = path(dir).with_extension("tmp");
     std::fs::write(&tmp, serde_json::to_string_pretty(s)?)?;
@@ -362,5 +401,48 @@ mod tests {
         let mut here = s.clone();
         here.apply_synced(&old);
         assert_eq!(here.calendars, s.calendars);
+    }
+
+    #[test]
+    fn data_deleting_choices_never_sync() {
+        let mut s = Settings::default();
+        s.keep_audio = "delete".into();
+        s.transcript_retention = "1d".into();
+        let v = serde_json::to_string(&s.synced()).unwrap();
+        assert!(!v.contains("keep_audio") && !v.contains("transcript_retention"));
+        // An item an older version synced (with them) never changes them here.
+        let old: Synced = serde_json::from_str(r#"{"name": "A", "keep_audio": "delete", "transcript_retention": "1d"}"#).unwrap();
+        let mut here = Settings::default();
+        here.apply_synced(&old);
+        assert_eq!(here.keep_audio, "keep");
+        assert_eq!(here.transcript_retention, "off");
+        assert_eq!(here.name, "A");
+    }
+
+    #[test]
+    fn a_broken_settings_file_keeps_what_reads() {
+        let dir = std::env::temp_dir().join(format!("cereal-settings-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // Missing file: defaults.
+        assert_eq!(load(&dir).name, "");
+        // `theme` has the wrong type, so serde rejects the whole file.
+        let text = r#"{"onboarded": true, "name": "Ana", "theme": 5, "notion_token": "secret_n", "hubspot_token": "pat-h",
+            "calendars": [{"id": "c1", "name": "Work", "url": "https://cal/ics", "enabled": true}]}"#;
+        std::fs::write(path(&dir), text).unwrap();
+        let s = load(&dir);
+        assert!(s.onboarded);
+        assert_eq!(s.name, "Ana");
+        assert_eq!(s.theme, "system");
+        assert_eq!(s.notion_token, "secret_n");
+        assert_eq!(s.hubspot_token, "pat-h");
+        assert_eq!(s.calendars.len(), 1);
+        // The original is kept aside, byte for byte.
+        let bad: Vec<_> = std::fs::read_dir(&dir).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().starts_with("settings.json.bad-")).collect();
+        assert_eq!(bad.len(), 1);
+        assert_eq!(std::fs::read_to_string(bad[0].path()).unwrap(), text);
+        // Not valid JSON at all: defaults.
+        assert_eq!(salvage("{\"name\": \"Ana\"").name, "");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

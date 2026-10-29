@@ -8,9 +8,44 @@ use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
 use screencapturekit::cm::{CMSampleBuffer, CMTime};
 use screencapturekit::prelude::*;
+use objc2_foundation::NSString;
 use std::sync::Arc;
 
 type ClockFn = Box<dyn Fn() -> Option<u64> + Send + Sync>;
+
+/// Shown while recording, and on a meeting that couldn't be recorded.
+pub const MIC_BLOCKED: &str = "macOS isn't letting Cereal use your microphone. Open System Settings > Privacy & Security > Microphone, turn on Cereal, then quit and reopen Cereal.";
+pub const MIC_SILENT: &str = "Your microphone is sending only silence. If macOS asked about the microphone, allow Cereal in System Settings > Privacy & Security > Microphone; otherwise check that the mic isn't muted.";
+pub const SOUND_BLOCKED: &str = "macOS hasn't allowed Cereal to hear your computer's sound yet. Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on Cereal, then start again.";
+
+mod ffi {
+    use objc2_foundation::NSString;
+    #[link(name = "AVFoundation", kind = "framework")]
+    extern "C" {
+        pub static AVMediaTypeAudio: &'static NSString;
+    }
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        pub fn CGPreflightScreenCaptureAccess() -> bool;
+    }
+}
+
+/// The microphone permission is off (denied, or restricted by the Mac's owner).
+/// Not asked yet counts as allowed: macOS asks when the microphone opens.
+pub fn mic_blocked() -> bool {
+    let Some(cls) = objc2::runtime::AnyClass::get(c"AVCaptureDevice") else { return false };
+    // AVAuthorizationStatus: 0 not determined, 1 restricted, 2 denied, 3 authorized.
+    let status: isize = unsafe {
+        let media: &NSString = ffi::AVMediaTypeAudio;
+        objc2::msg_send![cls, authorizationStatusForMediaType: media]
+    };
+    status == 1 || status == 2
+}
+
+/// "Screen & System Audio Recording" is allowed (checks only, never asks).
+pub fn sound_allowed() -> bool {
+    unsafe { ffi::CGPreflightScreenCaptureAccess() }
+}
 
 struct Handler {
     track: Arc<Mutex<Track>>,
@@ -56,7 +91,7 @@ pub struct SystemAudio {
 
 impl SystemAudio {
     pub fn start(track: Arc<Mutex<Track>>, clock: ClockFn) -> Result<SystemAudio> {
-        let perm = || anyhow!("macOS hasn't allowed Cereal to hear your computer's sound yet. Open System Settings > Privacy & Security > Screen & System Audio Recording, turn on Cereal, then start again.");
+        let perm = || anyhow!("{SOUND_BLOCKED}");
         let content = SCShareableContent::get().map_err(|_| perm())?;
         let display = content.displays().into_iter().next().ok_or_else(perm)?;
         let filter = SCContentFilter::create().with_display(&display).with_excluding_windows(&[]).build().map_err(|e| anyhow!("{e:?}"))?;

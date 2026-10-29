@@ -22,11 +22,11 @@ pub fn handle_args(app: &AppHandle, args: &[String]) {
         match t {
             "new-note" => handle_args(app, &["--start".to_string()]),
             "settings" => crate::show_hub(app, Some("settings")),
-            "restart" => app.restart(),
-            _ => quit(app),
+            "restart" => restart(app),
+            _ => crate::quit_after_flush(app),
         }
     } else if args.iter().any(|a| a == "--quit") {
-        quit(app);
+        crate::quit_after_flush(app);
     } else if args.iter().any(|a| a == "--hide") {
         // Minimize, never hide: a hidden window would leave Cereal running unseen.
         if let Some(w) = app.get_webview_window("main") {
@@ -83,16 +83,26 @@ pub fn open_url(app: &AppHandle, url: &str) {
 }
 
 pub fn quit(app: &AppHandle) {
-    // Finish a recording properly so the audio files are complete.
-    if let Some(st) = app.try_state::<crate::state::St>() {
-        if let Some(sess) = st.session.lock().take() {
-            if let Some(c) = sess.cap {
-                c.stop();
-            }
-        }
-    }
+    finish_recording(app);
     clear_state(app);
     app.exit(0);
+}
+
+/// Restarts Cereal (menu, jump list, updates), finishing a recording first.
+pub fn restart(app: &AppHandle) -> ! {
+    finish_recording(app);
+    app.restart()
+}
+
+/// Finishes a recording properly so the audio files are complete (the WAV
+/// headers are written); the meeting is processed on the next start.
+pub fn finish_recording(app: &AppHandle) {
+    if let Some(st) = app.try_state::<crate::state::St>() {
+        let sess = st.session.lock().take();
+        if let Some(c) = sess.and_then(|s| s.cap) {
+            c.stop();
+        }
+    }
 }
 
 /// Removes running.json (the app is no longer running).

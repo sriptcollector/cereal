@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Account, api, CalendarSrc, ModelsInfo, on, Provider } from "../api";
 import type { Go } from "./App";
-import { copy, fmtBytes, Icon, Row, Section, toast, Toggle, useSettings, useTemplates } from "./ui";
+import { copy, fmtBytes, Icon, Row, Section, toast, Toggle, useDebounced, useSettings, useTemplates } from "./ui";
 import { DEFAULT_CONSENT } from "./consent";
 import Credit from "./Credit";
 
@@ -25,6 +25,31 @@ const NAV: [string, string][] = [
   ["account", "Account"],
   ["about", "About"],
 ];
+
+/** A text setting. Typing stays in the field and is saved when you pause or
+ *  leave it (never a save per keystroke, which dropped characters). */
+function Field({ value, save, rows, ...rest }: { value: string; save: (v: string) => unknown; rows?: number; placeholder?: string; type?: string; style?: React.CSSProperties }) {
+  const [v, setV] = useState(value);
+  const editing = useRef(false);
+  const saveSoon = useDebounced(save, 700);
+  useEffect(() => {
+    if (!editing.current) setV(value);
+  }, [value]);
+  const props = {
+    ...rest,
+    value: v,
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setV(e.target.value);
+      saveSoon(e.target.value);
+    },
+    onFocus: () => (editing.current = true),
+    onBlur: () => {
+      editing.current = false;
+      void saveSoon.flush();
+    },
+  };
+  return rows ? <textarea rows={rows} {...props} /> : <input {...props} />;
+}
 
 export default function SettingsPage({ go, section }: { go: Go; section?: string }) {
   const [exe, setExe] = useState("");
@@ -109,23 +134,23 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
 
         <Section title="Profile" id="profile">
           <Row title="Name" desc="Used instead of “Me” in transcripts and notes.">
-            <input value={s.name} placeholder="Your name" onChange={(e) => save({ name: e.target.value })} />
+            <Field value={s.name} placeholder="Your name" save={(v) => save({ name: v })} />
           </Row>
           <Row title="Job title">
-            <input value={s.job_title} placeholder="e.g. Head of Sales" onChange={(e) => save({ job_title: e.target.value })} />
+            <Field value={s.job_title} placeholder="e.g. Head of Sales" save={(v) => save({ job_title: v })} />
           </Row>
           <div className="row col">
             <div className="row-title">About you and your work</div>
             <div className="row-desc">A sentence or two that helps the notes (your company, your team, what you care about).</div>
-            <textarea rows={3} value={s.about} onChange={(e) => save({ about: e.target.value })} placeholder="I run sales at a 20-person design agency. Clients are mostly SaaS startups." />
+            <Field rows={3} value={s.about} save={(v) => save({ about: v })} placeholder="I run sales at a 20-person design agency. Clients are mostly SaaS startups." />
           </div>
           <Row title="Company name">
-            <input value={s.company_name} placeholder="e.g. Acme" onChange={(e) => save({ company_name: e.target.value })} />
+            <Field value={s.company_name} placeholder="e.g. Acme" save={(v) => save({ company_name: v })} />
           </Row>
           <div className="row col">
             <div className="row-title">About your company</div>
             <div className="row-desc">What it does and who its customers are. Helps the notes get names and context right.</div>
-            <textarea rows={2} value={s.company_about} onChange={(e) => save({ company_about: e.target.value })} placeholder="Design agency for SaaS startups, 20 people." />
+            <Field rows={2} value={s.company_about} save={(v) => save({ company_about: v })} placeholder="Design agency for SaaS startups, 20 people." />
           </div>
         </Section>
 
@@ -283,7 +308,7 @@ export default function SettingsPage({ go, section }: { go: Go; section?: string
           </Row>
           <div className="row col">
             <div className="row-title">“Let others know” message</div>
-            <textarea rows={3} value={s.consent_message} onChange={(e) => save({ consent_message: e.target.value })} />
+            <Field rows={3} value={s.consent_message} save={(v) => save({ consent_message: v })} />
             {s.consent_message !== DEFAULT_CONSENT && (
               <div>
                 <button className="btn ghost" onClick={() => save({ consent_message: DEFAULT_CONSENT })}>
@@ -320,12 +345,12 @@ cereal folders list`}</pre>
           <Row title="Slack and other apps" desc="Post a folder's new notes to Slack, Zapier, Make or n8n: open the folder and set its webhook." />
           <Row title="Notion" desc="An internal integration token (notion.so/my-integrations) and the page notes go under (share that page with the integration). Then use Send to Notion on a note.">
             <div style={{ display: "grid", gap: 6, width: 280 }}>
-              <input type="password" placeholder="Integration token" value={s.notion_token} onChange={(e) => save({ notion_token: e.target.value.trim() })} />
-              <input placeholder="Page link" value={s.notion_page} onChange={(e) => save({ notion_page: e.target.value.trim() })} />
+              <Field type="password" placeholder="Integration token" value={s.notion_token} save={(v) => save({ notion_token: v.trim() })} />
+              <Field placeholder="Page link" value={s.notion_page} save={(v) => save({ notion_page: v.trim() })} />
             </div>
           </Row>
           <Row title="HubSpot" desc="A private app token with notes and contacts access. Log in HubSpot attaches the notes to attendees who are contacts.">
-            <input type="password" style={{ width: 280 }} placeholder="Private app token" value={s.hubspot_token} onChange={(e) => save({ hubspot_token: e.target.value.trim() })} />
+            <Field type="password" style={{ width: 280 }} placeholder="Private app token" value={s.hubspot_token} save={(v) => save({ hubspot_token: v.trim() })} />
           </Row>
         </Section>
 
@@ -379,9 +404,9 @@ cereal folders list`}</pre>
               </Row>
               {s.speech_cloud_on && (
                 <div className="row col">
-                  <input value={s.speech_cloud.base_url} onChange={(e) => save({ speech_cloud: { ...s.speech_cloud, base_url: e.target.value } })} placeholder="https://api.groq.com/openai/v1" />
-                  <input value={s.speech_cloud.model} onChange={(e) => save({ speech_cloud: { ...s.speech_cloud, model: e.target.value } })} placeholder="whisper-large-v3-turbo" />
-                  <input type="password" value={s.speech_cloud.api_key} onChange={(e) => save({ speech_cloud: { ...s.speech_cloud, api_key: e.target.value } })} placeholder="API key (stays on this computer)" />
+                  <Field value={s.speech_cloud.base_url} save={(v) => save((cur) => ({ speech_cloud: { ...cur.speech_cloud, base_url: v } }))} placeholder="https://api.groq.com/openai/v1" />
+                  <Field value={s.speech_cloud.model} save={(v) => save((cur) => ({ speech_cloud: { ...cur.speech_cloud, model: v } }))} placeholder="whisper-large-v3-turbo" />
+                  <Field type="password" value={s.speech_cloud.api_key} save={(v) => save((cur) => ({ speech_cloud: { ...cur.speech_cloud, api_key: v } }))} placeholder="API key (stays on this computer)" />
                 </div>
               )}
               <Row title="Notes AI" desc="On this computer by default. A cloud model gets your transcript and notes when it writes notes or answers.">
@@ -393,9 +418,9 @@ cereal folders list`}</pre>
               </Row>
               {cloud(s.llm_provider) && (
                 <div className="row col">
-                  <input value={s.llm_cloud.base_url} onChange={(e) => save({ llm_cloud: { ...s.llm_cloud, base_url: e.target.value } })} placeholder={s.llm_provider === "anthropic" ? "https://api.anthropic.com" : "https://api.openai.com/v1"} />
-                  <input value={s.llm_cloud.model} onChange={(e) => save({ llm_cloud: { ...s.llm_cloud, model: e.target.value } })} placeholder={s.llm_provider === "anthropic" ? "claude-sonnet-5-5" : "gpt-4.1-mini"} />
-                  <input type="password" value={s.llm_cloud.api_key} onChange={(e) => save({ llm_cloud: { ...s.llm_cloud, api_key: e.target.value } })} placeholder="API key (stays on this computer)" />
+                  <Field value={s.llm_cloud.base_url} save={(v) => save((cur) => ({ llm_cloud: { ...cur.llm_cloud, base_url: v } }))} placeholder={s.llm_provider === "anthropic" ? "https://api.anthropic.com" : "https://api.openai.com/v1"} />
+                  <Field value={s.llm_cloud.model} save={(v) => save((cur) => ({ llm_cloud: { ...cur.llm_cloud, model: v } }))} placeholder={s.llm_provider === "anthropic" ? "claude-sonnet-5-5" : "gpt-4.1-mini"} />
+                  <Field type="password" value={s.llm_cloud.api_key} save={(v) => save((cur) => ({ llm_cloud: { ...cur.llm_cloud, api_key: v } }))} placeholder="API key (stays on this computer)" />
                 </div>
               )}
             </>

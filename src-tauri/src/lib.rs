@@ -87,15 +87,36 @@ fn create_main(app: &AppHandle, visible: bool) -> tauri::Result<()> {
     });
     let w2 = w.clone();
     w.on_window_event(move |ev| match ev {
-        tauri::WindowEvent::CloseRequested { .. } => {
+        tauri::WindowEvent::CloseRequested { api, .. } => {
             // Nothing runs in the background: closing the main window quits Cereal
             // (a recording is finished properly first), popup, pill and tray included.
-            hub::quit(w2.app_handle());
+            // The page saves a note or title still waiting to be saved first.
+            api.prevent_close();
+            quit_after_flush(w2.app_handle());
         }
         tauri::WindowEvent::Focused(_) => update_pill(w2.app_handle()),
         _ => {}
     });
     Ok(())
+}
+
+/// Asks the page to save what's still waiting (notes and titles are saved a
+/// moment after typing stops), then quits. Quits anyway after 2 s.
+pub fn quit_after_flush(app: &AppHandle) {
+    static ASKED: AtomicBool = AtomicBool::new(false);
+    if !UI_READY.load(Ordering::SeqCst) || app.emit_to("main", "flush-and-quit", ()).is_err() {
+        hub::quit(app);
+        return;
+    }
+    if ASKED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(2));
+        let a = app.clone();
+        let _ = app.run_on_main_thread(move || hub::quit(&a));
+    });
 }
 
 // ---------------- meeting-detected popup ----------------
@@ -367,8 +388,8 @@ fn on_menu(app: &AppHandle, id: &str) {
     match id {
         "open" => show_hub(app, None),
         "settings" => show_hub(app, Some("settings")),
-        "quit" => hub::quit(app),
-        "restart" => app.restart(),
+        "quit" => quit_after_flush(app),
+        "restart" => hub::restart(app),
         id if id.starts_with("ev:") => {
             let ev = id.trim_start_matches("ev:").to_string();
             if let Ok(m) = library_cmds::note_for_event(app.state::<St>(), ev) {
@@ -593,9 +614,18 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building Cereal")
-        .run(|app, ev| {
-            if let tauri::RunEvent::Exit = ev {
-                hub::clear_state(app);
+        .run(|app, ev| match ev {
+            // Cmd+Q, Dock > Quit, logout, `app.restart()`: finish a recording so
+            // its files are complete. When the person quits (no exit code yet),
+            // also let the page save what's still waiting, like closing the window.
+            tauri::RunEvent::ExitRequested { code, api, .. } => {
+                hub::finish_recording(app);
+                if code.is_none() && app.get_webview_window("main").is_some() {
+                    api.prevent_exit();
+                    quit_after_flush(app);
+                }
             }
+            tauri::RunEvent::Exit => hub::clear_state(app),
+            _ => {}
         });
 }
